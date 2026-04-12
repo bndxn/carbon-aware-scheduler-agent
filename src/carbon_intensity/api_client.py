@@ -4,8 +4,8 @@ import json
 from typing import Any
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+
+from carbon_intensity.retry_session import retry_session
 
 BASE_URL = "https://api.carbonintensity.org.uk"
 
@@ -17,28 +17,12 @@ def _session() -> requests.Session:
     global _SESSION
     if _SESSION is not None:
         return _SESSION
-
-    retries = Retry(
-        total=5,
-        connect=5,
-        read=5,
-        backoff_factor=1.0,
-        status_forcelist=(429, 502, 503, 504),
-        allowed_methods=frozenset({"GET"}),
-        raise_on_status=False,
+    _SESSION = retry_session(
+        user_agent=(
+            "carbon-aware-scheduler-agent/0.1 (+https://github.com/carbon-intensity)"
+        )
     )
-    adapter = HTTPAdapter(max_retries=retries)
-    s = requests.Session()
-    s.mount("https://", adapter)
-    s.mount("http://", adapter)
-    s.headers.update(
-        {
-            "Accept": "application/json",
-            "User-Agent": "carbon-aware-scheduler-agent/0.1 (+https://github.com/carbon-intensity)",
-        }
-    )
-    _SESSION = s
-    return s
+    return _SESSION
 
 
 def call_carbon_intensity_api(
