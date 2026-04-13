@@ -40,4 +40,8 @@ resource "aws_ecs_express_gateway_service" "api" {
   depends_on = [
     aws_secretsmanager_secret_version.anthropic,
   ]
+
+  lifecycle {
+    ignore_changes = [ingress_paths]
+  }
 }

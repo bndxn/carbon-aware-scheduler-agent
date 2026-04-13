@@ -51,3 +51,21 @@ variable "secret_recovery_window_days" {
   description = "Secrets Manager recovery window when deleting the secret."
   default     = 7
 }
+
+variable "static_site_bucket_name" {
+  type        = string
+  description = "S3 bucket name for static site (default: {project_name}-static-{account_id}). Must be globally unique if set."
+  default     = null
+}
+
+variable "cloudfront_price_class" {
+  type        = string
+  description = "CloudFront price class (e.g. PriceClass_100, PriceClass_200, PriceClass_All)."
+  default     = "PriceClass_100"
+}
+
+variable "cloudfront_cache_policy_id" {
+  type        = string
+  description = "AWS managed cache policy ID (default: Managed-CachingOptimized; avoids cloudfront:ListCachePolicies)."
+  default     = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+}

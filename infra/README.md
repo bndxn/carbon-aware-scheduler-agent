@@ -1,4 +1,4 @@
-# Terraform: ECR + ECS Express Mode + Secrets Manager (PR4)
+# Terraform: API on ECS Express + static site on S3 / CloudFront (PR4–PR5)
 
 Creates:
 
@@ -6,6 +6,7 @@ Creates:
 - **IAM**: task execution role (ECR pull, logs, read Anthropic secret) and **Express infrastructure** role (AWS-managed policy for Express)
 - **Secrets Manager** secret + version for `ANTHROPIC_API_KEY`
 - **ECS cluster**, **CloudWatch** log group, **`aws_ecs_express_gateway_service`** (Express Mode) on **Fargate** with health check `GET /health` and container port **8000**
+- **S3** bucket (private) + **CloudFront** distribution with **origin access control (OAC)** and a small **response headers** policy (security headers)
 
 The Express **service name** is `${project_name}-web` (default **`carbon-agent-web`**) so it does not collide with a stale **INACTIVE** Express service name left in the account after a failed apply.
 
@@ -62,10 +63,20 @@ After apply, set **repository variables** (Settings → Secrets and variables �
 | `ECR_REPOSITORY` | `terraform output -raw ecr_repository_name` |
 | `ECS_CLUSTER` | `terraform output -raw ecs_cluster_name` |
 | `ECS_SERVICE` | `terraform output -raw ecs_service_name` |
+| `S3_BUCKET` | `terraform output -raw static_site_bucket_name` |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `terraform output -raw cloudfront_distribution_id` |
 
 Keep **`AWS_ROLE_ARN`** as a **secret** for OIDC (already configured).
 
 Public API URL(s): `terraform output api_ingress_paths`
+Static site URL: `terraform output -raw static_site_url`
+
+The deploy workflow needs IAM permission for **`s3:PutObject` / `DeleteObject` / `ListBucket`** on the bucket and **`cloudfront:CreateInvalidation`** on the distribution (see planning doc). After the first successful deploy, open the **static site URL**; `site/index.html` is synced from the repo.
+
+### Optional variables
+
+- `static_site_bucket_name` — override the default `{project_name}-static-{account_id}` S3 bucket name (must be globally unique).
+- `cloudfront_price_class` — default `PriceClass_100` (US/Europe).
 
 ## Rotate the API key
 

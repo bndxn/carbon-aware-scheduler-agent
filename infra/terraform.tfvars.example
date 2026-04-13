@@ -10,3 +10,9 @@ anthropic_api_key = ""
 
 # Optional: pin image after first ECR push if you need to avoid :latest during bootstrap.
 # api_image = "123456789012.dkr.ecr.eu-west-2.amazonaws.com/carbon-agent-api:latest"
+
+# Optional: override S3 bucket name for static site (must be globally unique).
+# static_site_bucket_name = "my-unique-static-bucket"
+
+# Optional: CloudFront price class (default PriceClass_100).
+# cloudfront_price_class = "PriceClass_200"

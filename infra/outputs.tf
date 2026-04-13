@@ -31,3 +31,18 @@ output "anthropic_secret_arn" {
   value       = aws_secretsmanager_secret.anthropic.arn
   sensitive   = true
 }
+
+output "static_site_bucket_name" {
+  description = "Set GitHub repository variable S3_BUCKET to this value (deploy workflow syncs site/ here)."
+  value       = aws_s3_bucket.static_site.id
+}
+
+output "cloudfront_distribution_id" {
+  description = "Set GitHub repository variable CLOUDFRONT_DISTRIBUTION_ID to this value."
+  value       = aws_cloudfront_distribution.static_site.id
+}
+
+output "static_site_url" {
+  description = "HTTPS URL for the static site (CloudFront)."
+  value       = "https://${aws_cloudfront_distribution.static_site.domain_name}"
+}
