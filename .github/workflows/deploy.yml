@@ -60,6 +60,7 @@ jobs:
           cd build/lambda
           zip -r ../lambda.zip .
 
+      # update-function-code does not change runtime; keep this in sync with infra/ecs.tf.
       - name: Update API Lambda code
         if: ${{ vars.LAMBDA_FUNCTION_NAME != '' }}
         env:
@@ -69,6 +70,10 @@ jobs:
             --function-name "$FUNCTION_NAME" \
             --zip-file "fileb://build/lambda.zip" \
             --publish
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION_NAME" \
+            --runtime python3.14
 
       - name: Update snapshot Lambda code
         if: ${{ vars.SNAPSHOT_LAMBDA_FUNCTION_NAME != '' }}
@@ -79,6 +84,10 @@ jobs:
             --function-name "$FUNCTION_NAME" \
             --zip-file "fileb://build/lambda.zip" \
             --publish
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION_NAME" \
+            --runtime python3.14
 
       - name: Sync static site to S3
         if: ${{ vars.S3_BUCKET != '' }}
