@@ -1,10 +1,10 @@
 # Incremental AWS demo build (reference)
 
-Snapshot of the incremental build plan for the employer-facing static site, ECS Express API, IaC, and GitHub deploy pipeline. Saved under `planning/` for long-term reference.
+Snapshot of the incremental build plan for the employer-facing static site, Lambda API, IaC, and GitHub deploy pipeline. Saved under `planning/` for long-term reference.
 
 ---
 
-# Incremental build: employer demo on AWS (static site + API via ECS Express Mode)
+# Incremental build: employer demo on AWS (static site + API via Lambda)
 
 ## Context from this repo
 
@@ -14,14 +14,14 @@ Snapshot of the incremental build plan for the employer-facing static site, ECS 
 **Architecture choices (updated):**
 
 - **Employer-facing UI**: a **static page** (plain HTML/CSS, optionally a small set of assets)—**no chat UI** and no JavaScript-heavy SPA requirement.
-- **API hosting**: **[Amazon ECS Express Mode](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/express-service-overview.html)**—ECS provisions **Fargate**, **Application Load Balancer** (shared across Express services in the account/region per AWS behavior), monitoring, and an AWS-provided URL—without hand-rolling every ECS+ALB primitive yourself. **Do not use App Runner** in this plan (and avoid presenting App Runner as an alternative).
-- **Why not API Gateway + Lambda for the agent API**: synchronous integrations are **~30s capped**; the agent can run longer tool loops, so **long-lived HTTP to a container** (Express/Fargate behind ALB) fits better.
+- **API hosting**: **AWS Lambda + Function URL** for a low-ops, low-baseline-cost HTTP API.
+- **Scheduled refresh**: **EventBridge -> Lambda** every 6 hours writes `snapshot.json` to the static S3 bucket so page views do not drive model/API cost.
 
 ### Static pages, crawlers, and “refresh every 6 hours”
 
 - **Reloading the static page does not reinvoke your API** by default. S3+CloudFront serves **HTML/CSS/assets**; each reload is just another `GET` for those objects. **No Anthropic call** happens unless you add **client-side JavaScript** that calls the API on `load`—avoid that on the public marketing page.
 - **Bots crawling the site** hit CloudFront/S3 the same way: static files only, **not** your container, unless they discover and hammer a **separate public API URL** you linked (e.g. `/api/chat`). If you expose an interactive chat API on the internet, protect it (auth, WAF, rate limits, or keep it off the public internet) rather than relying on “no one will find it.”
-- **Updating demo content on a schedule (e.g. every 6 hours)** should be **decoupled from page views**: run a **scheduled job** (e.g. **Amazon EventBridge** rule `rate(6 hours)` or a cron) that invokes a **short-lived task** (ECS scheduled task on Fargate, Lambda if it fits) which calls your existing carbon/API logic (or a **single** `run_agent` run if you truly want copy refreshed that way), then **writes the result into S3** next to the static site—for example `snapshot.json` or a regenerated snippet—and optionally **invalidates only that path** in CloudFront. The static `index.html` can reference `./snapshot.json` with **no JS polling**; browsers and bots only see new text after the next scheduled upload + cache behavior you define.
+- **Updating demo content on a schedule (e.g. every 6 hours)** should be **decoupled from page views**: run a **scheduled job** (EventBridge `rate(6 hours)`) that invokes a **short-lived Lambda** which calls your existing carbon/API logic (or a single `run_agent` run) and **writes output to S3** next to the static site (for example `snapshot.json`). The static `index.html` can reference `./snapshot.json` with **no JS polling**; browsers and bots only see new text after the next scheduled upload + cache behavior you define.
 
 ---
 
@@ -47,7 +47,7 @@ Snapshot of the incremental build plan for the employer-facing static site, ECS 
 **4. Deploy artifacts**
 
 - Static: upload the folder as-is to S3 (no `npm run build` unless you voluntarily add a static site generator later).
-- API: container image pushed to ECR and deployed to **ECS Express Mode**.
+- API: Lambda zip package deployed to **Lambda Function URL**.
 
 ---
 
@@ -76,23 +76,23 @@ Snapshot of the incremental build plan for the employer-facing static site, ECS 
 
 ---
 
-## Phase D — AWS: API (ECR + ECS Express Mode)
+## Phase D — AWS: API (Lambda + Secrets Manager)
 
-**9. ECR repository**
+**9. Lambda API function**
 
-- IaC defines the repo; CI pushes `:main` / `:git-sha` tags.
+- IaC defines Lambda runtime/handler/memory/timeout and publishes a public Function URL for `/health` + `/api/chat`.
 
-**10. ECS Express Mode service**
+**10. Lambda IAM execution role**
 
-- Define the Express Mode ECS service pointing at your container image and port (e.g. 8000), task execution role, and infrastructure role per AWS requirements. Express Mode creates/manages the **ALB**, **Fargate** tasks, security groups, and related wiring as described in the [Express overview](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/express-service-overview.html)—prefer this over a fully manual ECS+ALB Terraform module unless you need low-level control.
+- Role includes CloudWatch logs + read access to the Anthropic secret.
 
 **11. Secrets**
 
-- Store `ANTHROPIC_API_KEY` in **Secrets Manager** (or SSM); inject into the task; **no key in GitHub** except via OIDC for deployment.
+- Store `ANTHROPIC_API_KEY` in **Secrets Manager**; expose ARN to Lambda env and resolve secret value at runtime.
 
 **12. Outputs**
 
-- Export the **Express-provided public URL / DNS** (and ECR URI) for docs and optional links from the static page.
+- Export API Function URL and Lambda names for CI/CD variables.
 
 ---
 
@@ -112,15 +112,15 @@ Snapshot of the incremental build plan for the employer-facing static site, ECS 
 
 ---
 
-## Phase E2 — Optional: scheduled refresh (e.g. every 6 hours)
+## Phase E2 — Scheduled refresh (implemented in PR5)
 
 **15b. EventBridge schedule**
 
-- Rule targeting an ECS **scheduled task** (same image as the API with a different command, or a smaller worker image) or Lambda: run the **data/agent job once**, write output to the **same S3 bucket** as the static site (`snapshot.json`, etc.).
+- Rule targeting the **snapshot Lambda**: run the data/agent job once and write output to the same static bucket (`snapshot.json`).
 
 **15c. IAM**
 
-- Task role allows `s3:PutObject` on the site bucket prefix; no need for public internet to hit the long-running Express service for this content.
+- Snapshot Lambda execution role allows `s3:PutObject` on the site bucket prefix.
 
 **15d. Cost and crawler safety**
 
@@ -133,12 +133,12 @@ Snapshot of the incremental build plan for the employer-facing static site, ECS 
 **16. GitHub OIDC → AWS IAM role**
 
 - Trust policy scoped to this repo and branch `main`.
-- Permissions: ECR push, **ECS Express / ECS service update** APIs needed for your deploy path, S3 sync, `cloudfront:CreateInvalidation` (and if using scheduled tasks, whatever EventBridge/ECS scheduling needs).
+- Permissions: Lambda code/config update, S3 sync, `cloudfront:CreateInvalidation`.
 
 **17. New workflow: deploy on `main` only**
 
 - **Trigger**: `on: push: branches: [main]`.
-- **Jobs** (`needs:`): quality gate → build & push API image → IaC apply or service update → **sync static folder to S3** → **invalidate CloudFront**.
+- **Jobs** (`needs:`): quality gate → build Lambda package → update API/snapshot Lambda code → **sync static folder to S3** → **invalidate CloudFront**.
 - No `VITE_*` variables unless you add a build step; for plain static files, sync is enough.
 
 **18. Keep PR CI unchanged**
@@ -198,27 +198,16 @@ Use **least privilege** in production: replace `Resource: "*"` with your ARNs (a
 
 **Avoid** putting long-lived AWS keys in GitHub; OIDC only.
 
-### 2. ECS **task execution role** (Fargate pulls image + logs + secrets injection)
+### 2. Lambda execution role
 
-Attach AWS managed **`AmazonECSTaskExecutionRolePolicy`** (covers ECR pull + CloudWatch Logs create/write).
+- Role used by both API and snapshot Lambda.
+- Needs CloudWatch logs permissions + `secretsmanager:GetSecretValue` for the Anthropic secret.
+- Snapshot handler additionally needs `s3:PutObject` to write `snapshot.json`.
 
-**Secrets**: add inline or managed policy allowing `secretsmanager:GetSecretValue` (and **`kms:Decrypt`** if the secret uses a **customer-managed KMS** key) on the **specific secret ARN(s)** used in the task definition for env injection.
+### 3. EventBridge -> Lambda schedule (Phase E2)
 
-**No** need for this role to call Anthropic; that is app code using env vars at runtime.
-
-### 3. ECS **task role** (your container at runtime)
-
-- **API service**: often **empty or minimal** if the app only calls **public HTTPS** (Anthropic, carbon API) and does not use AWS APIs. If the app writes to S3, DynamoDB, etc., grant those actions here.
-- **Scheduled snapshot task**: grant **`s3:PutObject`** (and optionally `s3:GetObject`, `s3:DeleteObject` if you replace objects) on **`arn:aws:s3:::your-bucket/prefix/*`**, plus **`kms:GenerateDataKey`** / `kms:Decrypt` if bucket uses SSE-KMS.
-
-### 4. ECS Express Mode — **infrastructure role** (Express-managed resources)
-
-Express Mode requires an **infrastructure IAM role** AWS uses to create/manage ALB, security groups, etc. **Do not invent permissions by hand**—follow the current **[Express Mode IAM documentation](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/express-service-overview.html)** (AWS lists required trust + permissions; they can change with the feature). Your IaC attaches this role to the Express service as AWS specifies.
-
-### 5. EventBridge → ECS scheduled task (optional Phase E2)
-
-- **EventBridge** needs permission to **invoke** `ecs:RunTask` (often via an **IAM role** that EventBridge assumes to run the task).
-- That role typically needs: `ecs:RunTask` on the task definition family, **`iam:PassRole`** for both **task execution** and **task** roles (scoped to those role ARNs), and optionally `ec2:Describe*` if using awsvpc networking details.
+- EventBridge schedule targets the snapshot Lambda directly.
+- Add `aws_lambda_permission` allowing `events.amazonaws.com` to invoke the function from the schedule rule ARN.
 
 ### 6. Terraform / bootstrap (one-time or CI)
 
@@ -227,10 +216,9 @@ Express Mode requires an **infrastructure IAM role** AWS uses to create/manage A
 
 ### Quick mental model
 
-- **GitHub OIDC role** = “CI can push ECR, roll ECS, sync S3, invalidate CF, and optionally apply IaC.”
-- **Task execution role** = “Fargate agent can pull image, write logs, read Secrets Manager for env.”
-- **Task role** = “My Python process can call AWS APIs (often none for API-only; S3 for snapshot worker).”
-- **Express infrastructure role** = “ECS can create/manage load balancer plumbing per AWS’s Express contract.”
+- **GitHub OIDC role** = “CI can update Lambda code, sync S3, invalidate CloudFront, and optionally apply IaC.”
+- **Lambda execution role** = “Lambda writes logs, reads Secrets Manager, and (for snapshot) writes to S3.”
+- **EventBridge rule + Lambda permission** = “Scheduler can invoke snapshot Lambda on cadence.”
 
 ### How to create these in IAM (console-oriented)
 
@@ -345,10 +333,9 @@ flowchart LR
 | PR1 | FastAPI + tests + env notes |
 | PR2 | Static `site/` (HTML/CSS) + short dev notes |
 | PR3 | Dockerfile + `.dockerignore` |
-| PR4 | IaC: ECR + **ECS Express Mode** service + secrets + outputs |
-| PR5 | IaC: S3 + CloudFront OAC |
-| PR6 | GitHub OIDC + main-only deploy workflow |
-| PR7+ | Custom domain, WAF, alarms |
-| PR8 (optional) | EventBridge + scheduled task → S3 snapshot + minimal invalidation |
+| PR4 | IaC foundation + static S3/CloudFront + initial AWS wiring |
+| PR5 | **Lambda API + scheduled snapshot Lambda + EventBridge + deploy workflow updates** |
+| PR6 | polish: custom domain, WAF, alarms, stricter IAM |
+| PR7+ | UX/content refresh and observability improvements |
 
-This order supports **local demo** after PR2–3, **API on AWS** after PR4, **full static + API** after PR6, and **crawler-safe scheduled refresh** when you add Phase E2.
+This order supports **local demo** after PR2–3, **API on AWS** after PR5, and **crawler-safe scheduled refresh** by default with EventBridge -> Lambda.
