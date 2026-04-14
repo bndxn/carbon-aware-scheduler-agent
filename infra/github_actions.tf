@@ -53,10 +53,7 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "lambda:UpdateFunctionConfiguration",
       "lambda:GetFunctionConfiguration",
     ]
-    resources = [
-      aws_lambda_function.api.arn,
-      aws_lambda_function.snapshot.arn,
-    ]
+    resources = [aws_lambda_function.snapshot.arn]
   }
 
   statement {
