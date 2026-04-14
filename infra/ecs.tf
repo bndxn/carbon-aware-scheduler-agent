@@ -11,7 +11,7 @@ resource "aws_cloudwatch_log_group" "snapshot" {
 resource "aws_lambda_function" "api" {
   function_name = local.lambda_function_name
   role          = aws_iam_role.lambda_execution.arn
-  runtime       = "python3.11"
+  runtime       = "python3.14"
   handler       = "carbon_intensity.web.lambda_handler.handler"
   filename      = "${path.module}/${var.lambda_package_path}"
 
@@ -34,7 +34,7 @@ resource "aws_lambda_function" "api" {
 resource "aws_lambda_function" "snapshot" {
   function_name = local.snapshot_lambda_function_name
   role          = aws_iam_role.lambda_execution.arn
-  runtime       = "python3.11"
+  runtime       = "python3.14"
   handler       = "carbon_intensity.web.snapshot_lambda_handler.handler"
   filename      = "${path.module}/${var.lambda_package_path}"
 
