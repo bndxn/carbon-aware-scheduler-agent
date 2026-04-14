@@ -1,29 +1,16 @@
-output "ecr_repository_name" {
-  description = "Set GitHub repository variable ECR_REPOSITORY to this value."
-  value       = aws_ecr_repository.api.name
+output "lambda_function_name" {
+  description = "Set GitHub repository variable LAMBDA_FUNCTION_NAME to this value."
+  value       = aws_lambda_function.api.function_name
 }
 
-output "ecr_repository_url" {
-  value = aws_ecr_repository.api.repository_url
+output "snapshot_lambda_function_name" {
+  description = "Name of the scheduled snapshot Lambda function."
+  value       = aws_lambda_function.snapshot.function_name
 }
 
-output "ecs_cluster_name" {
-  description = "Set GitHub repository variable ECS_CLUSTER to this value."
-  value       = aws_ecs_cluster.main.name
-}
-
-output "ecs_service_name" {
-  description = "Set GitHub repository variable ECS_SERVICE to this value."
-  value       = aws_ecs_express_gateway_service.api.service_name
-}
-
-output "express_service_arn" {
-  value = aws_ecs_express_gateway_service.api.service_arn
-}
-
-output "api_ingress_paths" {
-  description = "Public URL(s) and paths for the Express service (ALB)."
-  value       = aws_ecs_express_gateway_service.api.ingress_paths
+output "api_function_url" {
+  description = "Public Lambda Function URL for the API."
+  value       = aws_lambda_function_url.api.function_url
 }
 
 output "anthropic_secret_arn" {
@@ -45,4 +32,19 @@ output "cloudfront_distribution_id" {
 output "static_site_url" {
   description = "HTTPS URL for the static site (CloudFront)."
   value       = "https://${aws_cloudfront_distribution.static_site.domain_name}"
+}
+
+output "snapshot_schedule_expression" {
+  description = "EventBridge schedule expression for snapshot refreshes."
+  value       = var.snapshot_schedule_expression
+}
+
+output "snapshot_s3_key" {
+  description = "S3 key written by the scheduled snapshot job."
+  value       = var.snapshot_s3_key
+}
+
+output "github_actions_deploy_role_arn" {
+  description = "When github_repository is set: set GitHub secret AWS_ROLE_ARN to this ARN."
+  value       = local.github_actions_enabled ? aws_iam_role.github_actions_deploy[0].arn : null
 }

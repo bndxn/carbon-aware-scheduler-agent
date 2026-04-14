@@ -15,6 +15,21 @@ app = FastAPI(
 )
 
 
+def _ensure_anthropic_api_key() -> None:
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return
+    secret_arn = os.environ.get("ANTHROPIC_API_KEY_SECRET_ARN")
+    if not secret_arn:
+        return
+    import boto3  # type: ignore[import-not-found]
+
+    client = boto3.client("secretsmanager")
+    secret = client.get_secret_value(SecretId=secret_arn)
+    value = secret.get("SecretString")
+    if value:
+        os.environ["ANTHROPIC_API_KEY"] = value
+
+
 def _cors_origins() -> list[str]:
     raw = os.environ.get("CORS_ORIGINS", "*")
     return [o.strip() for o in raw.split(",") if o.strip()]
@@ -44,5 +59,6 @@ def health() -> dict[str, str]:
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(body: ChatRequest) -> ChatResponse:
+    _ensure_anthropic_api_key()
     reply = run_agent(body.message)
     return ChatResponse(reply=reply)
