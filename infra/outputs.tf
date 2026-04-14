@@ -1,16 +1,6 @@
-output "lambda_function_name" {
-  description = "Set GitHub repository variable LAMBDA_FUNCTION_NAME to this value."
-  value       = aws_lambda_function.api.function_name
-}
-
 output "snapshot_lambda_function_name" {
-  description = "Name of the scheduled snapshot Lambda function."
+  description = "Set GitHub repository variable SNAPSHOT_LAMBDA_FUNCTION_NAME to this value."
   value       = aws_lambda_function.snapshot.function_name
-}
-
-output "api_function_url" {
-  description = "Public Lambda Function URL for the API."
-  value       = aws_lambda_function_url.api.function_url
 }
 
 output "anthropic_secret_arn" {

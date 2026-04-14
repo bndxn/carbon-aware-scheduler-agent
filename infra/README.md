@@ -1,8 +1,7 @@
-# Terraform: API on Lambda + static site on S3 / CloudFront
+# Terraform: scheduled snapshot Lambda + static site on S3 / CloudFront
 
 Creates:
 
-- **Lambda** function for the FastAPI API (`/health`, `/api/chat`) exposed via **Function URL**
 - **Lambda** function for scheduled snapshot generation, triggered by **EventBridge schedule** (default `rate(6 hours)`), writing `snapshot.json` to the static S3 bucket
 - **IAM** execution role for Lambda (CloudWatch logs + read Anthropic secret + write snapshot to S3)
 - **Secrets Manager** secret + version for `ANTHROPIC_API_KEY`
@@ -66,19 +65,17 @@ After apply, set **repository variables** (Settings â†’ Secrets and variables â†
 | Variable | Source |
 |----------|--------|
 | `AWS_REGION` | Same as `aws_region` (e.g. `eu-west-2`) |
-| `LAMBDA_FUNCTION_NAME` | `terraform output -raw lambda_function_name` |
 | `SNAPSHOT_LAMBDA_FUNCTION_NAME` | `terraform output -raw snapshot_lambda_function_name` |
 | `S3_BUCKET` | `terraform output -raw static_site_bucket_name` |
 | `CLOUDFRONT_DISTRIBUTION_ID` | `terraform output -raw cloudfront_distribution_id` |
 
 If you use **`github_repository`** in Terraform, set **`AWS_ROLE_ARN`** to **`github_actions_deploy_role_arn`** from outputs. If you created the deploy role manually instead, keep that ARN in **`AWS_ROLE_ARN`**.
 
-Public API URL: `terraform output -raw api_function_url`
 Static site URL: `terraform output -raw static_site_url`
 Snapshot Lambda: `terraform output -raw snapshot_lambda_function_name`
 Snapshot key: `terraform output -raw snapshot_s3_key`
 
-The managed **GitHub deploy role** (when enabled) includes **`lambda:UpdateFunctionCode`** for the API Lambda, plus static site sync/invalidation permissions used by `.github/workflows/deploy.yml`.
+The managed **GitHub deploy role** (when enabled) includes **`lambda:UpdateFunctionCode`** for the snapshot Lambda, plus static site sync/invalidation permissions used by `.github/workflows/deploy.yml`.
 
 ### Optional variables
 

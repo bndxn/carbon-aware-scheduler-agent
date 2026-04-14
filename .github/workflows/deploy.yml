@@ -1,7 +1,7 @@
 # Requires repository secret: AWS_ROLE_ARN (deploy role ARN).
-# Optional repository variables: AWS_REGION (default eu-west-2), LAMBDA_FUNCTION_NAME,
+# Optional repository variables: AWS_REGION (default eu-west-2),
 # SNAPSHOT_LAMBDA_FUNCTION_NAME, S3_BUCKET, CLOUDFRONT_DISTRIBUTION_ID.
-# Release job runs when at least one Lambda function name is set.
+# Release job runs when snapshot Lambda and/or static site variables are set.
 
 name: Deploy
 
@@ -39,7 +39,7 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     needs: [aws-oidc-smoke]
-    if: ${{ vars.LAMBDA_FUNCTION_NAME != '' || vars.SNAPSHOT_LAMBDA_FUNCTION_NAME != '' }}
+    if: ${{ vars.SNAPSHOT_LAMBDA_FUNCTION_NAME != '' || vars.S3_BUCKET != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,20 +61,6 @@ jobs:
           zip -r ../lambda.zip .
 
       # update-function-code does not change runtime; keep this in sync with infra/ecs.tf.
-      - name: Update API Lambda code
-        if: ${{ vars.LAMBDA_FUNCTION_NAME != '' }}
-        env:
-          FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME }}
-        run: |
-          aws lambda update-function-code \
-            --function-name "$FUNCTION_NAME" \
-            --zip-file "fileb://build/lambda.zip" \
-            --publish
-          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
-          aws lambda update-function-configuration \
-            --function-name "$FUNCTION_NAME" \
-            --runtime python3.14
-
       - name: Update snapshot Lambda code
         if: ${{ vars.SNAPSHOT_LAMBDA_FUNCTION_NAME != '' }}
         env:
