@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     while True:
         try:
             line = input("> ").strip()
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             print()
             return 0
         if not line:

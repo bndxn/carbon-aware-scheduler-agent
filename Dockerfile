@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Fargate uses linux/amd64: build with docker build --platform linux/amd64 (e.g. from Apple Silicon).
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
