@@ -3,10 +3,32 @@
 
 aws_region          = "eu-west-2"
 project_name        = "carbon-agent"
-ecr_repository_name = "carbon-agent-api"
 
 # Required: Anthropic API key for the running task (stored in Secrets Manager).
 anthropic_api_key = ""
 
-# Optional: pin image after first ECR push if you need to avoid :latest during bootstrap.
-# api_image = "123456789012.dkr.ecr.eu-west-2.amazonaws.com/carbon-agent-api:latest"
+# Optional: Lambda sizing.
+# lambda_memory_size     = 512
+# lambda_timeout_seconds = 30
+
+# Optional: initial Lambda package path used during terraform apply.
+# lambda_package_path = "artifacts/lambda.zip"
+
+# Optional: scheduled snapshot job (cost optimization).
+# snapshot_schedule_enabled    = true
+# snapshot_schedule_expression = "rate(6 hours)"
+# snapshot_s3_key              = "snapshot.json"
+# snapshot_prompt              = "Give a concise update on current and near-term GB grid carbon intensity and practical low-carbon timing advice."
+
+# Optional: override S3 bucket name for static site (must be globally unique).
+# static_site_bucket_name = "my-unique-static-bucket"
+
+# Optional: CloudFront price class (default PriceClass_100).
+# cloudfront_price_class = "PriceClass_200"
+
+# Optional: GitHub OIDC deploy role (PR5). Requires GitHub IAM OIDC provider in the account.
+# github_repository     = "my-org/carbon-aware-scheduler-agent"
+# github_deploy_branch  = "main"
+
+# Optional: override managed cache policy ID (default = Managed-CachingOptimized).
+# cloudfront_cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"

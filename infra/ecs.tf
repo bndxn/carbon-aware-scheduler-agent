@@ -1,43 +1,85 @@
 resource "aws_cloudwatch_log_group" "api" {
-  name              = "/ecs/${var.project_name}-api"
+  name              = "/aws/lambda/${local.lambda_function_name}"
   retention_in_days = var.log_retention_days
 }
 
-resource "aws_ecs_cluster" "main" {
-  name = var.project_name
+resource "aws_cloudwatch_log_group" "snapshot" {
+  name              = "/aws/lambda/${local.snapshot_lambda_function_name}"
+  retention_in_days = var.log_retention_days
 }
 
-resource "aws_ecs_express_gateway_service" "api" {
-  cluster                 = aws_ecs_cluster.main.name
-  service_name            = local.service_name
-  execution_role_arn      = aws_iam_role.task_execution.arn
-  infrastructure_role_arn = aws_iam_role.express_infrastructure.arn
-  health_check_path       = "/health"
-  cpu                     = var.express_cpu
-  memory                  = var.express_memory
-  wait_for_steady_state   = false
+resource "aws_lambda_function" "api" {
+  function_name = local.lambda_function_name
+  role          = aws_iam_role.lambda_execution.arn
+  runtime       = "python3.11"
+  handler       = "carbon_intensity.web.lambda_handler.handler"
+  filename      = "${path.module}/${var.lambda_package_path}"
 
-  network_configuration {
-    subnets         = local.subnet_ids
-    security_groups = [data.aws_security_group.default.id]
-  }
+  source_code_hash = filebase64sha256("${path.module}/${var.lambda_package_path}")
+  memory_size      = var.lambda_memory_size
+  timeout          = var.lambda_timeout_seconds
 
-  primary_container {
-    image          = local.container_image
-    container_port = 8000
-
-    aws_logs_configuration {
-      log_group         = aws_cloudwatch_log_group.api.name
-      log_stream_prefix = "api"
-    }
-
-    secret {
-      name       = "ANTHROPIC_API_KEY"
-      value_from = aws_secretsmanager_secret.anthropic.arn
+  environment {
+    variables = {
+      ANTHROPIC_API_KEY_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn
     }
   }
 
   depends_on = [
+    aws_cloudwatch_log_group.api,
     aws_secretsmanager_secret_version.anthropic,
   ]
+}
+
+resource "aws_lambda_function" "snapshot" {
+  function_name = local.snapshot_lambda_function_name
+  role          = aws_iam_role.lambda_execution.arn
+  runtime       = "python3.11"
+  handler       = "carbon_intensity.web.snapshot_lambda_handler.handler"
+  filename      = "${path.module}/${var.lambda_package_path}"
+
+  source_code_hash = filebase64sha256("${path.module}/${var.lambda_package_path}")
+  memory_size      = var.lambda_memory_size
+  timeout          = var.lambda_timeout_seconds
+
+  environment {
+    variables = {
+      ANTHROPIC_API_KEY_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn
+      SNAPSHOT_BUCKET              = aws_s3_bucket.static_site.id
+      SNAPSHOT_KEY                 = var.snapshot_s3_key
+      SNAPSHOT_PROMPT              = var.snapshot_prompt
+    }
+  }
+
+  depends_on = [
+    aws_cloudwatch_log_group.snapshot,
+    aws_secretsmanager_secret_version.anthropic,
+  ]
+}
+
+resource "aws_lambda_function_url" "api" {
+  function_name      = aws_lambda_function.api.function_name
+  authorization_type = "NONE"
+}
+
+resource "aws_cloudwatch_event_rule" "snapshot_schedule" {
+  count               = var.snapshot_schedule_enabled ? 1 : 0
+  name                = "${var.project_name}-snapshot-schedule"
+  schedule_expression = var.snapshot_schedule_expression
+  description         = "Runs Lambda snapshot job on a fixed schedule."
+}
+
+resource "aws_cloudwatch_event_target" "snapshot_lambda" {
+  count = var.snapshot_schedule_enabled ? 1 : 0
+  rule  = aws_cloudwatch_event_rule.snapshot_schedule[0].name
+  arn   = aws_lambda_function.snapshot.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_snapshot" {
+  count         = var.snapshot_schedule_enabled ? 1 : 0
+  statement_id  = "AllowExecutionFromEventBridgeSnapshotSchedule"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.snapshot.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.snapshot_schedule[0].arn
 }
