@@ -1,34 +1,6 @@
-resource "aws_cloudwatch_log_group" "api" {
-  name              = "/aws/lambda/${local.lambda_function_name}"
-  retention_in_days = var.log_retention_days
-}
-
 resource "aws_cloudwatch_log_group" "snapshot" {
   name              = "/aws/lambda/${local.snapshot_lambda_function_name}"
   retention_in_days = var.log_retention_days
-}
-
-resource "aws_lambda_function" "api" {
-  function_name = local.lambda_function_name
-  role          = aws_iam_role.lambda_execution.arn
-  runtime       = "python3.14"
-  handler       = "carbon_intensity.web.lambda_handler.handler"
-  filename      = "${path.module}/${var.lambda_package_path}"
-
-  source_code_hash = filebase64sha256("${path.module}/${var.lambda_package_path}")
-  memory_size      = var.lambda_memory_size
-  timeout          = var.lambda_timeout_seconds
-
-  environment {
-    variables = {
-      ANTHROPIC_API_KEY_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn
-    }
-  }
-
-  depends_on = [
-    aws_cloudwatch_log_group.api,
-    aws_secretsmanager_secret_version.anthropic,
-  ]
 }
 
 resource "aws_lambda_function" "snapshot" {
@@ -55,11 +27,6 @@ resource "aws_lambda_function" "snapshot" {
     aws_cloudwatch_log_group.snapshot,
     aws_secretsmanager_secret_version.anthropic,
   ]
-}
-
-resource "aws_lambda_function_url" "api" {
-  function_name      = aws_lambda_function.api.function_name
-  authorization_type = "NONE"
 }
 
 resource "aws_cloudwatch_event_rule" "snapshot_schedule" {
