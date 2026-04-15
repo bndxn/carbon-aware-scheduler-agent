@@ -48,7 +48,7 @@ resource "aws_iam_role_policy" "lambda_snapshot_s3" {
         Action = [
           "s3:PutObject",
         ]
-        Resource = "${aws_s3_bucket.static_site.arn}/*"
+        Resource = "${aws_s3_bucket.static_site.arn}/${var.snapshot_s3_key}"
       },
     ]
   })

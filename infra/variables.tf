@@ -18,13 +18,13 @@ variable "anthropic_api_key" {
 
 variable "lambda_memory_size" {
   type        = number
-  description = "Lambda memory (MB) for API function."
+  description = "Lambda memory (MB) for the scheduled snapshot function."
   default     = 512
 }
 
 variable "lambda_timeout_seconds" {
   type        = number
-  description = "Lambda timeout in seconds for API function."
+  description = "Lambda timeout in seconds for the scheduled snapshot function."
   default     = 30
 }
 
@@ -60,7 +60,7 @@ variable "snapshot_s3_key" {
 
 variable "log_retention_days" {
   type        = number
-  description = "CloudWatch log retention for the API container."
+  description = "CloudWatch log retention for Lambda logs."
   default     = 30
 }
 
