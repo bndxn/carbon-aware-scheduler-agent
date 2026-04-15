@@ -6,6 +6,7 @@ Creates:
 - **IAM** execution role for Lambda (CloudWatch logs + read Anthropic secret + write snapshot to S3)
 - **Secrets Manager** secret + version for `ANTHROPIC_API_KEY`
 - **S3** bucket (private) + **CloudFront** distribution with **origin access control (OAC)** and response security headers
+- **CloudWatch alarms + SNS topic** for snapshot reliability and optional CloudFront 5xx monitoring
 - **Optional GitHub Actions deploy role** (OIDC): set `github_repository` to `owner/repo` to create an IAM role with snapshot Lambda update, S3 sync, and CloudFront invalidation (use `terraform output -raw github_actions_deploy_role_arn` as **`AWS_ROLE_ARN`**)
 
 Requires **Terraform >= 1.5** and **hashicorp/aws >= 6.23**.
@@ -74,6 +75,7 @@ If you use **`github_repository`** in Terraform, set **`AWS_ROLE_ARN`** to **`gi
 Static site URL: `terraform output -raw static_site_url`
 Snapshot Lambda: `terraform output -raw snapshot_lambda_function_name`
 Snapshot key: `terraform output -raw snapshot_s3_key`
+Alarm SNS topic: `terraform output -raw alarm_topic_arn`
 
 ## IAM least-privilege matrix
 
@@ -99,6 +101,12 @@ The managed **GitHub deploy role** (when enabled) only targets the snapshot Lamb
 - `snapshot_schedule_expression` - EventBridge expression (default `rate(6 hours)`).
 - `snapshot_s3_key` - S3 object key written by the snapshot Lambda (default `snapshot.json`).
 - `snapshot_prompt` - agent prompt used for each scheduled snapshot generation.
+- `alarms_enabled` - enable/disable CloudWatch alarms and SNS topic.
+- `alarm_email_endpoints` - list of email addresses subscribed to alarms (requires confirmation).
+- `alarm_duration_p95_threshold_ms` - threshold for p95 snapshot Lambda duration alarm.
+- `alarm_min_invocations_period_seconds` - window to detect missing scheduled runs.
+- `alarm_cloudfront_5xx_enabled` - enable/disable CloudFront 5xx alarm.
+- `alarm_cloudfront_5xx_rate_threshold` - threshold for CloudFront 5xx error rate alarm.
 - `github_repository` - e.g. `org/repo`; empty skips the OIDC deploy role.
 - `github_deploy_branch` - branch name for OIDC `sub` (default `main`).
 
