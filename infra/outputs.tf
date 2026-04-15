@@ -38,3 +38,8 @@ output "github_actions_deploy_role_arn" {
   description = "When github_repository is set: set GitHub secret AWS_ROLE_ARN to this ARN."
   value       = local.github_actions_enabled ? aws_iam_role.github_actions_deploy[0].arn : null
 }
+
+output "alarm_topic_arn" {
+  description = "SNS topic ARN used by CloudWatch alarms (null when alarms are disabled)."
+  value       = var.alarms_enabled ? aws_sns_topic.alerts[0].arn : null
+}

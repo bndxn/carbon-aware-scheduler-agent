@@ -99,3 +99,39 @@ variable "github_deploy_branch" {
   description = "Branch allowed to assume the deploy role (token sub repo:...:ref:refs/heads/<this>)."
   default     = "main"
 }
+
+variable "alarms_enabled" {
+  type        = bool
+  description = "Enable CloudWatch alarms and SNS notifications for snapshot reliability."
+  default     = true
+}
+
+variable "alarm_email_endpoints" {
+  type        = list(string)
+  description = "Email endpoints subscribed to alarm SNS topic. Recipients must confirm subscriptions."
+  default     = []
+}
+
+variable "alarm_duration_p95_threshold_ms" {
+  type        = number
+  description = "Alarm threshold for p95 Lambda duration in milliseconds."
+  default     = 20000
+}
+
+variable "alarm_min_invocations_period_seconds" {
+  type        = number
+  description = "Period used to detect missing snapshot runs via Lambda invocations."
+  default     = 28800
+}
+
+variable "alarm_cloudfront_5xx_rate_threshold" {
+  type        = number
+  description = "Threshold for CloudFront 5xx error rate alarm (percentage)."
+  default     = 1
+}
+
+variable "alarm_cloudfront_5xx_enabled" {
+  type        = bool
+  description = "Enable CloudFront 5xx error rate alarm."
+  default     = true
+}
