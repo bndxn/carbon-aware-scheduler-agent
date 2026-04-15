@@ -1,4 +1,4 @@
-# Terraform: snapshot Lambda + static site on S3 / CloudFront
+# Terraform: scheduled snapshot Lambda + static site on S3 / CloudFront
 
 Creates:
 

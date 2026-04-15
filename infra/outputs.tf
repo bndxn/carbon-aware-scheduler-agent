@@ -1,5 +1,5 @@
 output "snapshot_lambda_function_name" {
-  description = "Name of the scheduled snapshot Lambda function."
+  description = "Set GitHub repository variable SNAPSHOT_LAMBDA_FUNCTION_NAME to this value."
   value       = aws_lambda_function.snapshot.function_name
 }
 

@@ -1,10 +1,10 @@
 # Incremental AWS demo build (reference)
 
-Snapshot of the incremental build plan for the employer-facing static site, Lambda API, IaC, and GitHub deploy pipeline. Saved under `planning/` for long-term reference.
+Snapshot of the incremental build plan for the employer-facing static site, scheduled snapshot Lambda, IaC, and GitHub deploy pipeline. Saved under `planning/` for long-term reference.
 
 ---
 
-# Incremental build: employer demo on AWS (static site + API via Lambda)
+# Incremental build: employer demo on AWS (static site + scheduled snapshot Lambda)
 
 ## Context from this repo
 
@@ -14,13 +14,13 @@ Snapshot of the incremental build plan for the employer-facing static site, Lamb
 **Architecture choices (updated):**
 
 - **Employer-facing UI**: a **static page** (plain HTML/CSS, optionally a small set of assets)—**no chat UI** and no JavaScript-heavy SPA requirement.
-- **API hosting**: **AWS Lambda + Function URL** for a low-ops, low-baseline-cost HTTP API.
+- **Production HTTP**: **none**—no public Lambda Function URL; **FastAPI** remains for **local dev and tests** only (`uvicorn`, `TestClient`).
 - **Scheduled refresh**: **EventBridge -> Lambda** every 6 hours writes `snapshot.json` to the static S3 bucket so page views do not drive model/API cost.
 
 ### Static pages, crawlers, and “refresh every 6 hours”
 
-- **Reloading the static page does not reinvoke your API** by default. S3+CloudFront serves **HTML/CSS/assets**; each reload is just another `GET` for those objects. **No Anthropic call** happens unless you add **client-side JavaScript** that calls the API on `load`—avoid that on the public marketing page.
-- **Bots crawling the site** hit CloudFront/S3 the same way: static files only, **not** your container, unless they discover and hammer a **separate public API URL** you linked (e.g. `/api/chat`). If you expose an interactive chat API on the internet, protect it (auth, WAF, rate limits, or keep it off the public internet) rather than relying on “no one will find it.”
+- **Reloading the static page** only fetches **HTML/CSS/assets** and optional **`snapshot.json`** from CloudFront/S3. **No Anthropic call** happens per page view unless you add **client-side JavaScript** that calls an external API on `load`—avoid that on the public marketing page.
+- **Bots crawling the site** hit CloudFront/S3 the same way: static files only.
 - **Updating demo content on a schedule (e.g. every 6 hours)** should be **decoupled from page views**: run a **scheduled job** (EventBridge `rate(6 hours)`) that invokes a **short-lived Lambda** which calls your existing carbon/API logic (or a single `run_agent` run) and **writes output to S3** next to the static site (for example `snapshot.json`). The static `index.html` can reference `./snapshot.json` with **no JS polling**; browsers and bots only see new text after the next scheduled upload + cache behavior you define.
 
 ---
@@ -47,7 +47,7 @@ Snapshot of the incremental build plan for the employer-facing static site, Lamb
 **4. Deploy artifacts**
 
 - Static: upload the folder as-is to S3 (no `npm run build` unless you voluntarily add a static site generator later).
-- API: Lambda zip package deployed to **Lambda Function URL**.
+- Snapshot job: Lambda zip deployed to the **snapshot** function (EventBridge schedule); no public HTTP surface in prod.
 
 ---
 
@@ -76,15 +76,15 @@ Snapshot of the incremental build plan for the employer-facing static site, Lamb
 
 ---
 
-## Phase D — AWS: API (Lambda + Secrets Manager)
+## Phase D — AWS: Snapshot Lambda + Secrets Manager
 
-**9. Lambda API function**
+**9. Snapshot Lambda function**
 
-- IaC defines Lambda runtime/handler/memory/timeout and publishes a public Function URL for `/health` + `/api/chat`.
+- IaC defines Lambda runtime/handler/memory/timeout for the scheduled job (no Function URL).
 
 **10. Lambda IAM execution role**
 
-- Role includes CloudWatch logs + read access to the Anthropic secret.
+- Role includes CloudWatch logs + read access to the Anthropic secret + `s3:PutObject` on the static bucket for `snapshot.json`.
 
 **11. Secrets**
 
@@ -92,7 +92,7 @@ Snapshot of the incremental build plan for the employer-facing static site, Lamb
 
 **12. Outputs**
 
-- Export API Function URL and Lambda names for CI/CD variables.
+- Export snapshot Lambda name, bucket, CloudFront id, and static site URL for CI/CD variables.
 
 ---
 
@@ -138,7 +138,7 @@ Snapshot of the incremental build plan for the employer-facing static site, Lamb
 **17. New workflow: deploy on `main` only**
 
 - **Trigger**: `on: push: branches: [main]`.
-- **Jobs** (`needs:`): quality gate → build Lambda package → update API/snapshot Lambda code → **sync static folder to S3** → **invalidate CloudFront**.
+- **Jobs** (`needs:`): quality gate → build Lambda package → update **snapshot** Lambda code → **sync static folder to S3** → **invalidate CloudFront**.
 - No `VITE_*` variables unless you add a build step; for plain static files, sync is enough.
 
 **18. Keep PR CI unchanged**
@@ -151,11 +151,11 @@ Snapshot of the incremental build plan for the employer-facing static site, Lamb
 
 **19. HTTPS and custom domain**
 
-- ACM + Route 53 for CloudFront and/or the Express URL, per AWS guidance.
+- ACM + Route 53 for CloudFront, per AWS guidance.
 
 **20. Abuse controls**
 
-- WAF, rate limits, optional protection on `/api/chat`.
+- WAF or similar on CloudFront if needed; no public app API in this layout.
 
 **21. Observability**
 
