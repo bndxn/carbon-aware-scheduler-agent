@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
-import anthropic
+import boto3
 import requests
-from anthropic.types import MessageParam, ToolParam, ToolResultBlockParam
 
 from carbon_intensity.api_client import (
     call_carbon_intensity_api,
@@ -18,10 +18,10 @@ from carbon_intensity.open_meteo import (
 )
 from carbon_intensity.prompts import SYSTEM_PROMPT
 
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 MAX_TOOL_ROUNDS = 16
 
-TOOLS: list[ToolParam] = [
+TOOLS: list[dict[str, object]] = [
     {
         "name": "carbon_intensity_get",
         "description": (
@@ -78,6 +78,57 @@ TOOLS: list[ToolParam] = [
         },
     },
 ]
+
+
+if TYPE_CHECKING:
+    from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
+else:  # pragma: no cover
+    BedrockRuntimeClient = Any
+
+
+def _bedrock_runtime_client() -> BedrockRuntimeClient:
+    region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+    if region:
+        return boto3.client("bedrock-runtime", region_name=region)
+    return boto3.client("bedrock-runtime")
+
+
+def _invoke_bedrock_messages(
+    *,
+    model_id: str,
+    system: str,
+    messages: list[dict[str, object]],
+    tools: list[dict[str, object]],
+    max_tokens: int,
+) -> dict[str, object]:
+    client = _bedrock_runtime_client()
+    payload: dict[str, object] = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": messages,
+        "tools": tools,
+    }
+
+    resp = client.invoke_model(
+        modelId=model_id,
+        body=json.dumps(payload).encode("utf-8"),
+        contentType="application/json",
+        accept="application/json",
+    )
+
+    body = resp.get("body")
+    raw_bytes = body.read() if hasattr(body, "read") else body
+    if isinstance(raw_bytes, str):
+        raw_text = raw_bytes
+    elif isinstance(raw_bytes, bytes):
+        raw_text = raw_bytes.decode("utf-8")
+    else:
+        raise RuntimeError("Unexpected Bedrock response body type.")
+    out = json.loads(raw_text)
+    if not isinstance(out, dict):
+        raise RuntimeError("Unexpected Bedrock response JSON.")
+    return out
 
 
 def _text_from_assistant(content: object) -> str:
@@ -151,50 +202,49 @@ def _run_tool(name: str, raw_input: dict[str, object]) -> str:
 
 
 def run_agent(user_message: str, *, model: str | None = None) -> str:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        msg = "Set ANTHROPIC_API_KEY in your environment (e.g. in .env)."
-        raise OSError(msg)
+    use_model = model or os.environ.get("BEDROCK_MODEL_ID", DEFAULT_MODEL_ID)
 
-    client = anthropic.Anthropic(api_key=api_key)
-    use_model = model or os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL)
-
-    messages: list[MessageParam] = [{"role": "user", "content": user_message}]
+    messages: list[dict[str, object]] = [{"role": "user", "content": user_message}]
     rounds = 0
 
     while rounds < MAX_TOOL_ROUNDS:
         rounds += 1
-        response = client.messages.create(
-            model=use_model,
+        response = _invoke_bedrock_messages(
+            model_id=use_model,
             max_tokens=8192,
             system=SYSTEM_PROMPT,
             messages=messages,
             tools=TOOLS,
         )
 
-        if response.stop_reason == "end_turn":
-            return _text_from_assistant(response.content) or "(No text reply.)"
+        stop_reason = response.get("stop_reason")
+        content = response.get("content", [])
 
-        if response.stop_reason != "tool_use":
-            return _text_from_assistant(response.content) or str(response.stop_reason)
+        if stop_reason == "end_turn":
+            return _text_from_assistant(content) or "(No text reply.)"
 
-        tool_result_blocks: list[ToolResultBlockParam] = []
-        for block in response.content:
-            btype = getattr(block, "type", None)
-            if btype != "tool_use":
-                continue
-            name = getattr(block, "name", "")
-            tool_id = getattr(block, "id", "")
-            raw_input = getattr(block, "input", {})
-            if not isinstance(raw_input, dict):
-                raw_input = {}
-            coerced = {str(k): v for k, v in raw_input.items()}
-            out = _run_tool(str(name), coerced)
-            tool_result_blocks.append(
-                {"type": "tool_result", "tool_use_id": tool_id, "content": out}
-            )
+        if stop_reason != "tool_use":
+            return _text_from_assistant(content) or str(stop_reason)
 
-        messages.append({"role": "assistant", "content": response.content})
+        tool_result_blocks: list[dict[str, object]] = []
+        if isinstance(content, Sequence) and not isinstance(content, (str, bytes)):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") != "tool_use":
+                    continue
+                name = block.get("name", "")
+                tool_id = block.get("id", "")
+                raw_input = block.get("input", {})
+                if not isinstance(raw_input, dict):
+                    raw_input = {}
+                coerced = {str(k): v for k, v in raw_input.items()}
+                out = _run_tool(str(name), coerced)
+                tool_result_blocks.append(
+                    {"type": "tool_result", "tool_use_id": str(tool_id), "content": out}
+                )
+
+        messages.append({"role": "assistant", "content": content})
         messages.append({"role": "user", "content": tool_result_blocks})
 
     return "Stopped: too many tool rounds (possible loop)."

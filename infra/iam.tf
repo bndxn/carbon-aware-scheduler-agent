@@ -18,8 +18,8 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy" "lambda_secrets" {
-  name = "read-anthropic-secret"
+resource "aws_iam_role_policy" "lambda_bedrock_invoke" {
+  name = "invoke-bedrock-model"
   role = aws_iam_role.lambda_execution.id
 
   policy = jsonencode({
@@ -28,9 +28,9 @@ resource "aws_iam_role_policy" "lambda_secrets" {
       {
         Effect = "Allow"
         Action = [
-          "secretsmanager:GetSecretValue",
+          "bedrock:InvokeModel",
         ]
-        Resource = aws_secretsmanager_secret.anthropic.arn
+        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.bedrock_model_id}"
       },
     ]
   })

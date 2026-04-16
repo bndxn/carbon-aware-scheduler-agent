@@ -28,7 +28,7 @@ def test_chat_validation() -> None:
 
 @patch(
     "carbon_intensity.web.app.run_agent",
-    side_effect=OSError("Set ANTHROPIC_API_KEY"),
+    side_effect=OSError("Bedrock invocation failed"),
 )
 def test_chat_propagates_oserror(mock_run: object) -> None:
     with pytest.raises(OSError):

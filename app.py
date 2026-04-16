@@ -1,4 +1,4 @@
-"""CLI: natural-language access to the GB Carbon Intensity API via Claude."""
+"""CLI: natural-language access to the GB Carbon Intensity API via Bedrock (Claude)."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
         "-m",
         "--model",
         default=None,
-        help="Override ANTHROPIC_MODEL (default: claude-sonnet-4-6)",
+        help="Override BEDROCK_MODEL_ID (default: set in code/env)",
     )
     args = p.parse_args(argv)
 
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    print("Carbon intensity agent (Claude). Commands: quit, exit, Ctrl+D")
+    print("Carbon intensity agent (Bedrock Claude). Commands: quit, exit, Ctrl+D")
     while True:
         try:
             line = input("> ").strip()
