@@ -78,8 +78,24 @@
         color: #fecaca;
       }
       .timestamp {
-        font-size: 0.9rem;
-        color: #94a3b8;
+        font-size: 0.95rem;
+        color: #cbd5e1;
+        margin: 0;
+      }
+      .generated-time {
+        display: block;
+        font-size: 1.05rem;
+        font-weight: 500;
+        color: #f1f5f9;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+      }
+      .generated-time-hint {
+        display: block;
+        margin-top: 0.45rem;
+        font-size: 0.8rem;
+        font-weight: 400;
+        color: #64748b;
       }
       .prompt-text {
         color: #cbd5e1;
@@ -148,6 +164,55 @@
       .hidden {
         display: none !important;
       }
+      .working-details {
+        padding-top: 0.5rem;
+      }
+      .working-details > summary {
+        cursor: pointer;
+        list-style-position: outside;
+        font-weight: 600;
+        font-size: 1rem;
+        color: #7dd3fc;
+        user-select: none;
+      }
+      .working-details > summary::-webkit-details-marker {
+        color: #94a3b8;
+      }
+      .working-details[open] > summary {
+        margin-bottom: 0.75rem;
+      }
+      .working-panel {
+        max-height: min(70vh, 36rem);
+        overflow: auto;
+        padding-right: 0.25rem;
+      }
+      .working-step {
+        margin-bottom: 1.35rem;
+      }
+      .working-step:last-child {
+        margin-bottom: 0;
+      }
+      .working-step h4 {
+        margin: 0 0 0.4rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .working-step pre {
+        margin: 0;
+        padding: 0.65rem 0.75rem;
+        background: #020617;
+        border: 1px solid #1e293b;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #cbd5e1;
+      }
     </style>
   </head>
   <body>
@@ -177,6 +242,10 @@
           <h2>Reply</h2>
           <div id="reply" class="reply-md"></div>
         </div>
+        <details id="working-details" class="card working-details hidden">
+          <summary>See my working</summary>
+          <div id="working-panel" class="working-panel"></div>
+        </details>
       </div>
     </main>
     <script
@@ -194,6 +263,8 @@
         const generatedAtEl = document.getElementById("generated-at");
         const promptEl = document.getElementById("prompt");
         const replyEl = document.getElementById("reply");
+        const workingDetailsEl = document.getElementById("working-details");
+        const workingPanelEl = document.getElementById("working-panel");
         const refreshBtn = document.getElementById("refresh-btn");
 
         function setReplyMarkdown(md) {
@@ -203,6 +274,43 @@
           } else {
             replyEl.textContent = md;
           }
+        }
+
+        function setGeneratedAt(iso) {
+          generatedAtEl.textContent = "";
+          const d = new Date(iso);
+          if (Number.isNaN(d.getTime())) {
+            generatedAtEl.textContent = iso;
+            return;
+          }
+          const london = new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Europe/London",
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZoneName: "short",
+          }).format(d);
+          const utc = new Intl.DateTimeFormat("en-GB", {
+            timeZone: "UTC",
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZoneName: "short",
+          }).format(d);
+          const time = document.createElement("time");
+          time.dateTime = iso;
+          time.className = "generated-time";
+          time.textContent = london;
+          time.title = "Snapshot written at " + iso;
+          generatedAtEl.appendChild(time);
+          const hint = document.createElement("span");
+          hint.className = "generated-time-hint";
+          hint.textContent = utc + " · hover for exact ISO timestamp";
+          generatedAtEl.appendChild(hint);
         }
 
         function showError(message) {
@@ -215,7 +323,56 @@
           statusEl.className = "card";
           statusEl.textContent = "Loading snapshot…";
           contentEl.classList.add("hidden");
+          workingDetailsEl.classList.add("hidden");
+          workingDetailsEl.open = false;
           refreshBtn.disabled = true;
+        }
+
+        function renderWorking(trace) {
+          workingPanelEl.textContent = "";
+          if (!Array.isArray(trace) || trace.length === 0) {
+            workingDetailsEl.classList.add("hidden");
+            return;
+          }
+          workingDetailsEl.classList.remove("hidden");
+          for (let i = 0; i < trace.length; i++) {
+            const step = trace[i];
+            const section = document.createElement("section");
+            section.className = "working-step";
+            const title = document.createElement("h4");
+            const pre = document.createElement("pre");
+            const t = step && step.type;
+            if (t === "system_prompt") {
+              title.textContent = "System instructions (sent to the model)";
+              pre.textContent = step.content;
+            } else if (t === "user_prompt") {
+              title.textContent = "Scheduled prompt";
+              pre.textContent = step.content;
+            } else if (t === "meta") {
+              title.textContent = "Run metadata & external services";
+              pre.textContent = JSON.stringify(step, null, 2);
+            } else if (t === "bedrock_assistant") {
+              title.textContent =
+                "Model turn " +
+                step.round +
+                " — stop_reason: " +
+                (step.stop_reason || "?");
+              pre.textContent = JSON.stringify(step.content, null, 2);
+            } else if (t === "tool_results") {
+              title.textContent =
+                "Tool calls & results (round " + (step.round || "?") + ")";
+              pre.textContent = JSON.stringify(step.calls, null, 2);
+            } else if (t === "error") {
+              title.textContent = "Run error";
+              pre.textContent = String(step.message || step);
+            } else {
+              title.textContent = t ? String(t) : "Step " + (i + 1);
+              pre.textContent = JSON.stringify(step, null, 2);
+            }
+            section.appendChild(title);
+            section.appendChild(pre);
+            workingPanelEl.appendChild(section);
+          }
         }
 
         async function loadSnapshot() {
@@ -239,9 +396,10 @@
               showError("snapshot.json has an unexpected shape.");
               return;
             }
-            generatedAtEl.textContent = data.generated_at;
+            setGeneratedAt(data.generated_at);
             promptEl.textContent = data.prompt;
             setReplyMarkdown(data.reply);
+            renderWorking(Array.isArray(data.working) ? data.working : []);
             statusEl.classList.add("hidden");
             contentEl.classList.remove("hidden");
           } catch (e) {

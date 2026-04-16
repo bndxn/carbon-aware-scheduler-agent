@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    working: list[dict[str, Any]] = Field(default_factory=list)
 
 
 @app.get("/health")
@@ -44,5 +46,5 @@ def health() -> dict[str, str]:
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(body: ChatRequest) -> ChatResponse:
-    reply = run_agent(body.message)
-    return ChatResponse(reply=reply)
+    result = run_agent(body.message)
+    return ChatResponse(reply=result.reply, working=result.working)

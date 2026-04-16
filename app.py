@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
             p.print_help()
             return 2
         try:
-            print(run_agent(text, model=args.model))
+            print(run_agent(text, model=args.model).reply)
         except OSError as e:
             print(e, file=sys.stderr)
             return 1
@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         if line.lower() in ("quit", "exit", "q"):
             return 0
         try:
-            print(run_agent(line, model=args.model))
+            print(run_agent(line, model=args.model).reply)
             print()
         except OSError as e:
             print(e, file=sys.stderr)

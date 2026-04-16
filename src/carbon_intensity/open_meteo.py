@@ -19,6 +19,9 @@ _TIMEOUT: tuple[float, float] = (15.0, 60.0)
 _HOURLY_VARS = (
     "temperature_2m",
     "cloud_cover",
+    "precipitation",
+    "precipitation_probability",
+    "rain",
     "wind_speed_10m",
     "wind_speed_120m",
     "wind_direction_10m",
@@ -83,8 +86,8 @@ def fetch_forecast_hourly(
     return cast(dict[str, Any], resp.json())
 
 
-def subsample_hourly(data: dict[str, Any], max_rows: int = 56) -> dict[str, Any]:
-    """Keep payloads small for the model (≈2–3 day hourly → ~56 points)."""
+def subsample_hourly(data: dict[str, Any], max_rows: int = 120) -> dict[str, Any]:
+    """Keep hourly payloads small but retain several days of context for the model."""
     hourly = data.get("hourly")
     if not isinstance(hourly, dict):
         return data
@@ -121,6 +124,7 @@ def weather_wind_forecast_for_model(
         "source": "Open-Meteo (CC BY 4.0)",
         "note": (
             "Point forecast near a location, not National Grid wind generation MW. "
+            "Includes rain / precipitation for laundry drying. "
             "Use with Carbon Intensity `generationmix` (especially `wind` %)."
         ),
     }
