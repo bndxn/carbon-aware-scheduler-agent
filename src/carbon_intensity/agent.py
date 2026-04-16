@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import boto3
@@ -20,6 +21,39 @@ from carbon_intensity.prompts import SYSTEM_PROMPT
 
 DEFAULT_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 MAX_TOOL_ROUNDS = 16
+# Tool outputs can be large; keep each result bounded for JSON snapshot / browser size.
+MAX_TOOL_RESULT_TRACE_CHARS = 120_000
+
+
+@dataclass
+class AgentRunResult:
+    """Final assistant reply plus an append-only trace for UI / auditing."""
+
+    reply: str
+    working: list[dict[str, Any]]
+
+
+def _truncate_for_trace(text: str) -> tuple[str, bool]:
+    if len(text) <= MAX_TOOL_RESULT_TRACE_CHARS:
+        return text, False
+    cut = MAX_TOOL_RESULT_TRACE_CHARS
+    return text[:cut] + "\n\n...[truncated for trace size]\n", True
+
+
+def _assistant_content_for_trace(content: object) -> list[dict[str, Any]]:
+    """Copy Bedrock assistant content blocks into JSON-safe dicts."""
+    blocks: list[dict[str, Any]] = []
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    if not isinstance(content, Sequence) or isinstance(content, (str, bytes)):
+        return blocks
+    for block in content:
+        if isinstance(block, dict):
+            blocks.append(dict(block))
+        else:
+            blocks.append({"type": "unknown_block", "repr": repr(block)[:800]})
+    return blocks
+
 
 TOOLS: list[dict[str, object]] = [
     {
@@ -51,10 +85,12 @@ TOOLS: list[dict[str, object]] = [
     {
         "name": "weather_wind_forecast",
         "description": (
-            "Hourly weather and wind forecast from Open-Meteo (free) for a GB "
-            "location. Pass `place_query` (e.g. London, Edinburgh, SW1A UK) or "
-            "`latitude`+`longitude`. Complements Carbon Intensity data: correlates "
-            "surface / 120 m wind with likely wind generation — not grid MW."
+            "Hourly weather from Open-Meteo (free) for a GB location: wind (10 m / "
+            "120 m), temperature, cloud cover, **rain / precipitation / "
+            "precipitation_probability** for laundry drying. Pass `place_query` "
+            "(e.g. London, Edinburgh, SW1A UK) or `latitude`+`longitude`. Use "
+            "`forecast_days` up to 7 when comparing drying conditions across several "
+            "days. Complements Carbon Intensity: point forecast is not grid MW."
         ),
         "input_schema": {
             "type": "object",
@@ -201,8 +237,28 @@ def _run_tool(name: str, raw_input: dict[str, object]) -> str:
     return json.dumps({"error": f"Unknown tool: {name}"})
 
 
-def run_agent(user_message: str, *, model: str | None = None) -> str:
+def run_agent(user_message: str, *, model: str | None = None) -> AgentRunResult:
     use_model = model or os.environ.get("BEDROCK_MODEL_ID", DEFAULT_MODEL_ID)
+
+    working: list[dict[str, Any]] = [
+        {
+            "type": "system_prompt",
+            "content": SYSTEM_PROMPT,
+        },
+        {
+            "type": "user_prompt",
+            "content": user_message,
+        },
+        {
+            "type": "meta",
+            "model_id": use_model,
+            "services": [
+                "AWS Bedrock (Anthropic Messages API)",
+                "GB Carbon Intensity API (api.carbonintensity.org.uk)",
+                "Open-Meteo (api.open-meteo.com)",
+            ],
+        },
+    ]
 
     messages: list[dict[str, object]] = [{"role": "user", "content": user_message}]
     rounds = 0
@@ -219,14 +275,25 @@ def run_agent(user_message: str, *, model: str | None = None) -> str:
 
         stop_reason = response.get("stop_reason")
         content = response.get("content", [])
+        working.append(
+            {
+                "type": "bedrock_assistant",
+                "round": rounds,
+                "stop_reason": stop_reason,
+                "content": _assistant_content_for_trace(content),
+            }
+        )
 
         if stop_reason == "end_turn":
-            return _text_from_assistant(content) or "(No text reply.)"
+            reply = _text_from_assistant(content) or "(No text reply.)"
+            return AgentRunResult(reply=reply, working=working)
 
         if stop_reason != "tool_use":
-            return _text_from_assistant(content) or str(stop_reason)
+            reply = _text_from_assistant(content) or str(stop_reason)
+            return AgentRunResult(reply=reply, working=working)
 
         tool_result_blocks: list[dict[str, object]] = []
+        calls_out: list[dict[str, Any]] = []
         if isinstance(content, Sequence) and not isinstance(content, (str, bytes)):
             for block in content:
                 if not isinstance(block, dict):
@@ -240,11 +307,38 @@ def run_agent(user_message: str, *, model: str | None = None) -> str:
                     raw_input = {}
                 coerced = {str(k): v for k, v in raw_input.items()}
                 out = _run_tool(str(name), coerced)
+                out_trace, truncated = _truncate_for_trace(out)
+                calls_out.append(
+                    {
+                        "tool_use_id": str(tool_id),
+                        "name": str(name),
+                        "input": coerced,
+                        "result": out_trace,
+                        "result_truncated": truncated,
+                    }
+                )
                 tool_result_blocks.append(
                     {"type": "tool_result", "tool_use_id": str(tool_id), "content": out}
                 )
 
+        working.append(
+            {
+                "type": "tool_results",
+                "round": rounds,
+                "calls": calls_out,
+            }
+        )
+
         messages.append({"role": "assistant", "content": content})
         messages.append({"role": "user", "content": tool_result_blocks})
 
-    return "Stopped: too many tool rounds (possible loop)."
+    return AgentRunResult(
+        reply="Stopped: too many tool rounds (possible loop).",
+        working=working
+        + [
+            {
+                "type": "error",
+                "message": f"Exceeded {MAX_TOOL_ROUNDS} Bedrock/tool rounds.",
+            }
+        ],
+    )

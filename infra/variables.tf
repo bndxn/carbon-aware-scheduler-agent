@@ -49,7 +49,9 @@ variable "snapshot_schedule_expression" {
 variable "snapshot_prompt" {
   type        = string
   description = "Prompt used by the scheduled Lambda job to generate snapshot content."
-  default     = "Give a concise update on current and near-term GB grid carbon intensity and practical low-carbon timing advice."
+  default = <<-EOT
+    Find the best day and approximate time window in the next few days to start a washing machine in Great Britain. Optimise for (1) lower grid carbon intensity during the wash and (2) clothes drying afterward: I can dry indoors or outside but prefer line drying outside, which needs dry weather and ideally mild or warm conditions. If I did not name a place, use London, UK as the default for weather_wind_forecast. Reply in Markdown with one primary recommendation, one backup, and short reasoning.
+  EOT
 }
 
 variable "snapshot_s3_key" {

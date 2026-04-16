@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from carbon_intensity.agent import AgentRunResult
 from carbon_intensity.web.app import app
 
 client = TestClient(app)
@@ -14,11 +15,17 @@ def test_health() -> None:
     assert r.json() == {"status": "ok"}
 
 
-@patch("carbon_intensity.web.app.run_agent", return_value="mocked reply")
+@patch(
+    "carbon_intensity.web.app.run_agent",
+    return_value=AgentRunResult(reply="mocked reply", working=[{"type": "meta"}]),
+)
 def test_chat(mock_run: object) -> None:
     r = client.post("/api/chat", json={"message": "What is the carbon intensity?"})
     assert r.status_code == 200
-    assert r.json() == {"reply": "mocked reply"}
+    assert r.json() == {
+        "reply": "mocked reply",
+        "working": [{"type": "meta"}],
+    }
 
 
 def test_chat_validation() -> None:
