@@ -8,6 +8,23 @@ data "aws_iam_policy_document" "lambda_assume" {
   }
 }
 
+locals {
+  # Bedrock supports invoking either a foundation model ID (mapped to a foundation-model ARN)
+  # or an inference profile ARN (account-scoped). We allow whichever form `bedrock_model_id`
+  # is set to, without granting broad Bedrock permissions.
+  #
+  # Examples:
+  # - Model ID: eu.anthropic.claude-... -> arn:aws:bedrock:REGION::foundation-model/<id>
+  # - Inference profile ARN: arn:aws:bedrock:REGION:ACCOUNT:inference-profile/<name>
+  bedrock_invoke_resource = startswith(var.bedrock_model_id, "arn:") ? var.bedrock_model_id : "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.bedrock_model_id}"
+
+  # When invoking via an inference profile ARN, Bedrock may evaluate authorization
+  # against the underlying foundation model ARN (which can be in a different region).
+  # To avoid brittle per-model/per-region mapping, allow InvokeModel on any
+  # foundation model ARN in addition to the specific inference profile ARN.
+  bedrock_invoke_resources = startswith(var.bedrock_model_id, "arn:") ? [var.bedrock_model_id, "arn:aws:bedrock:*::foundation-model/*"] : ["arn:aws:bedrock:${var.aws_region}::foundation-model/${var.bedrock_model_id}"]
+}
+
 resource "aws_iam_role" "lambda_execution" {
   name               = "${var.project_name}-lambda-exec"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
@@ -30,7 +47,7 @@ resource "aws_iam_role_policy" "lambda_bedrock_invoke" {
         Action = [
           "bedrock:InvokeModel",
         ]
-        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.bedrock_model_id}"
+        Resource = local.bedrock_invoke_resources
       },
     ]
   })

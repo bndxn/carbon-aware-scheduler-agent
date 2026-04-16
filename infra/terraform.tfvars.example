@@ -3,8 +3,10 @@
 aws_region          = "eu-west-2"
 project_name        = "carbon-agent"
 
-# Optional: Bedrock model ID for the snapshot Lambda.
-# bedrock_model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+# Optional: Bedrock invoke identifier for the snapshot Lambda.
+# Accepts either a model ID or an inference profile ARN.
+# bedrock_model_id = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+# bedrock_model_id = "arn:aws:bedrock:eu-west-2:123936123774:inference-profile/<name>"
 
 # Optional: Lambda sizing.
 # lambda_memory_size     = 512

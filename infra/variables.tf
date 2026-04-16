@@ -12,8 +12,8 @@ variable "project_name" {
 
 variable "bedrock_model_id" {
   type        = string
-  description = "Bedrock model ID used by the snapshot Lambda (e.g. an Anthropic Claude model ID in Bedrock)."
-  default     = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  description = "Bedrock invoke identifier used by the snapshot Lambda. Set either a model ID (e.g. eu.anthropic.claude-...) or an inference profile ARN (arn:aws:bedrock:REGION:ACCOUNT:inference-profile/...)."
+  default     = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
 
 variable "lambda_memory_size" {

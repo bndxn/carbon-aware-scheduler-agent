@@ -18,7 +18,7 @@ from carbon_intensity.open_meteo import (
 )
 from carbon_intensity.prompts import SYSTEM_PROMPT
 
-DEFAULT_MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+DEFAULT_MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 MAX_TOOL_ROUNDS = 16
 
 TOOLS: list[dict[str, object]] = [

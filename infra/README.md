@@ -81,7 +81,7 @@ Alarm SNS topic: `terraform output -raw alarm_topic_arn`
 | GitHub deploy role | `s3:ListBucket` | `aws_s3_bucket.static_site.arn` |
 | GitHub deploy role | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `${aws_s3_bucket.static_site.arn}/*` |
 | GitHub deploy role | `cloudfront:CreateInvalidation` | `aws_cloudfront_distribution.static_site.arn` |
-| Snapshot Lambda execution role | `secretsmanager:GetSecretValue` | `aws_secretsmanager_secret.anthropic.arn` |
+| Snapshot Lambda execution role | `bedrock:InvokeModel` | model ID → `arn:aws:bedrock:REGION::foundation-model/<id>` **or** inference profile ARN |
 | Snapshot Lambda execution role | `s3:PutObject` | `${aws_s3_bucket.static_site.arn}/${var.snapshot_s3_key}` |
 
 The managed **GitHub deploy role** (when enabled) only targets the snapshot Lambda and static site resources used by `.github/workflows/deploy.yml`.
