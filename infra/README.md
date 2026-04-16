@@ -3,8 +3,8 @@
 Creates:
 
 - **Lambda** function for scheduled snapshot generation, triggered by **EventBridge schedule** (default `rate(6 hours)`), writing `snapshot.json` to the static S3 bucket
-- **IAM** execution role for Lambda (CloudWatch logs + read Anthropic secret + write snapshot to S3)
-- **Secrets Manager** secret + version for `ANTHROPIC_API_KEY`
+- **IAM** execution role for Lambda (CloudWatch logs + Bedrock invoke + write snapshot to S3)
+- **Bedrock model invocation** (Claude via Bedrock) using IAM auth (no external API key)
 - **S3** bucket (private) + **CloudFront** distribution with **origin access control (OAC)** and response security headers
 - **CloudWatch alarms + SNS topic** for snapshot reliability and optional CloudFront 5xx monitoring
 - **Optional GitHub Actions deploy role** (OIDC): set `github_repository` to `owner/repo` to create an IAM role with snapshot Lambda update, S3 sync, and CloudFront invalidation (use `terraform output -raw github_actions_deploy_role_arn` as **`AWS_ROLE_ARN`**)
@@ -18,11 +18,7 @@ Requires **Terraform >= 1.5** and **hashicorp/aws >= 6.23**.
 
 ## Configure
 
-1. Copy `terraform.tfvars.example` to `terraform.tfvars` (gitignored) **or** export:
-
-   ```bash
-   export TF_VAR_anthropic_api_key="your-key"
-   ```
+1. Copy `terraform.tfvars.example` to `terraform.tfvars` (gitignored) and set any overrides you want (e.g. `bedrock_model_id`), or just use defaults.
 
 2. Optional: adjust `aws_region`, `project_name`, and Lambda sizing variables in `terraform.tfvars`.
 
@@ -52,7 +48,7 @@ When running Terraform locally for this stack, use the expected AWS profile:
 
 ```bash
 cd infra
-set -a && source ../.env && export TF_VAR_anthropic_api_key="$ANTHROPIC_API_KEY" && export AWS_PROFILE=carbon-local-dev && set +a
+set -a && source ../.env && export AWS_PROFILE=carbon-local-dev && set +a
 terraform plan -input=false
 terraform apply
 ```
@@ -110,6 +106,6 @@ The managed **GitHub deploy role** (when enabled) only targets the snapshot Lamb
 - `github_repository` - e.g. `org/repo`; empty skips the OIDC deploy role.
 - `github_deploy_branch` - branch name for OIDC `sub` (default `main`).
 
-## Rotate the API key
+## Bedrock access
 
-Update the secret value in Secrets Manager (console or CLI), then rerun the deploy workflow so Lambda picks up config/code changes.
+Ensure the Lambda execution role is allowed to invoke the configured Bedrock model and that the model is available in your chosen region.

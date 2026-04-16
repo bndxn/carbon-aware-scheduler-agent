@@ -10,10 +10,10 @@ variable "project_name" {
   default     = "carbon-agent"
 }
 
-variable "anthropic_api_key" {
+variable "bedrock_model_id" {
   type        = string
-  description = "Anthropic API key stored in Secrets Manager (use TF_VAR_anthropic_api_key or a gitignored terraform.tfvars file)."
-  sensitive   = true
+  description = "Bedrock model ID used by the snapshot Lambda (e.g. an Anthropic Claude model ID in Bedrock)."
+  default     = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 }
 
 variable "lambda_memory_size" {
@@ -64,11 +64,6 @@ variable "log_retention_days" {
   default     = 30
 }
 
-variable "secret_recovery_window_days" {
-  type        = number
-  description = "Secrets Manager recovery window when deleting the secret."
-  default     = 7
-}
 
 variable "static_site_bucket_name" {
   type        = string

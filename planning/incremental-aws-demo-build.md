@@ -32,7 +32,7 @@ Snapshot of the incremental build plan for the employer-facing static site, sche
 - New module (e.g. `src/carbon_intensity/web/` or top-level `api/`) exposing:
   - `GET /health` (or `/healthz`) for load balancer checks
   - `POST /api/chat` (or similar) with JSON body `{ "message": "..." }` returning `{ "reply": "..." }` by calling existing `run_agent` (for API clients, scripts, or future use—not required to be called from the static page)
-- Read `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_MODEL`) from the environment only; do not bake secrets into images.
+- Use AWS Bedrock IAM auth (and configure `BEDROCK_MODEL_ID`); do not bake credentials into images.
 - **CORS**: still useful if you later add a form or tools hitting the API; if the static page is purely informational, CORS can stay permissive for your CloudFront origin or be tightened later.
 
 **2. Add automated tests for the API**
@@ -88,7 +88,7 @@ Snapshot of the incremental build plan for the employer-facing static site, sche
 
 **11. Secrets**
 
-- Store `ANTHROPIC_API_KEY` in **Secrets Manager**; expose ARN to Lambda env and resolve secret value at runtime.
+- No external API key required; Lambda uses IAM auth to call Bedrock Runtime.
 
 **12. Outputs**
 

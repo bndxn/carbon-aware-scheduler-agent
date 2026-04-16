@@ -3,12 +3,6 @@ output "snapshot_lambda_function_name" {
   value       = aws_lambda_function.snapshot.function_name
 }
 
-output "anthropic_secret_arn" {
-  description = "Secrets Manager ARN for the API key (sensitive)."
-  value       = aws_secretsmanager_secret.anthropic.arn
-  sensitive   = true
-}
-
 output "static_site_bucket_name" {
   description = "Set GitHub repository variable S3_BUCKET to this value (deploy workflow syncs site/ here)."
   value       = aws_s3_bucket.static_site.id

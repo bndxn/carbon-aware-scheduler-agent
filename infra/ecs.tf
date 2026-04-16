@@ -16,16 +16,15 @@ resource "aws_lambda_function" "snapshot" {
 
   environment {
     variables = {
-      ANTHROPIC_API_KEY_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn
-      SNAPSHOT_BUCKET              = aws_s3_bucket.static_site.id
-      SNAPSHOT_KEY                 = var.snapshot_s3_key
-      SNAPSHOT_PROMPT              = var.snapshot_prompt
+      BEDROCK_MODEL_ID = var.bedrock_model_id
+      SNAPSHOT_BUCKET  = aws_s3_bucket.static_site.id
+      SNAPSHOT_KEY     = var.snapshot_s3_key
+      SNAPSHOT_PROMPT  = var.snapshot_prompt
     }
   }
 
   depends_on = [
     aws_cloudwatch_log_group.snapshot,
-    aws_secretsmanager_secret_version.anthropic,
   ]
 }
 

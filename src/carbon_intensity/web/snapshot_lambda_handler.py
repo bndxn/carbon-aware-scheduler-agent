@@ -5,22 +5,9 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
-import boto3  # type: ignore[import-not-found]
+import boto3
 
 from carbon_intensity.agent import run_agent
-
-
-def _ensure_anthropic_api_key() -> None:
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return
-    secret_arn = os.environ.get("ANTHROPIC_API_KEY_SECRET_ARN")
-    if not secret_arn:
-        return
-    client = boto3.client("secretsmanager")
-    secret = client.get_secret_value(SecretId=secret_arn)
-    value = secret.get("SecretString")
-    if value:
-        os.environ["ANTHROPIC_API_KEY"] = value
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -34,7 +21,6 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         "and practical low-carbon timing advice.",
     )
 
-    _ensure_anthropic_api_key()
     reply = run_agent(prompt)
 
     payload = {
