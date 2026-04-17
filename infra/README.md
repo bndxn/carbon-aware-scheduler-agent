@@ -2,7 +2,7 @@
 
 Creates:
 
-- **Lambda** function for scheduled snapshot generation, triggered by **EventBridge schedule** (default `rate(6 hours)`), writing `snapshot.json` to the static S3 bucket
+- **Lambda** function for scheduled snapshot generation, triggered by **EventBridge Scheduler** (default **daily at 06:00 `Europe/London`**), writing `snapshot.json` to the static S3 bucket
 - **IAM** execution role for Lambda (CloudWatch logs + Bedrock invoke + write snapshot to S3)
 - **Bedrock model invocation** (Claude via Bedrock) using IAM auth (no external API key)
 - **S3** bucket (private) + **CloudFront** distribution with **origin access control (OAC)** and response security headers
@@ -94,7 +94,8 @@ The managed **GitHub deploy role** (when enabled) only targets the snapshot Lamb
 - `lambda_memory_size` / `lambda_timeout_seconds` - tune Lambda cost/performance.
 - `lambda_package_path` - zip used for first create (deploy workflow updates function code after that).
 - `snapshot_schedule_enabled` - enable/disable scheduled snapshot Lambda.
-- `snapshot_schedule_expression` - EventBridge expression (default `rate(6 hours)`).
+- `snapshot_schedule_expression` - EventBridge **Scheduler** expression (default `cron(0 6 * * ? *)` = daily 06:00 in `snapshot_schedule_timezone`).
+- `snapshot_schedule_timezone` - IANA zone for the schedule (default `Europe/London`; set empty string for UTC).
 - `snapshot_s3_key` - S3 object key written by the snapshot Lambda (default `snapshot.json`).
 - `snapshot_prompt` - agent prompt used for each scheduled snapshot generation.
 - `alarms_enabled` - enable/disable CloudWatch alarms and SNS topic.

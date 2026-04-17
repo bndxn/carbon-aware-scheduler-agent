@@ -70,3 +70,36 @@ resource "aws_iam_role_policy" "lambda_snapshot_s3" {
     ]
   })
 }
+
+resource "aws_iam_role" "snapshot_scheduler" {
+  count              = var.snapshot_schedule_enabled ? 1 : 0
+  name               = "${var.project_name}-snapshot-scheduler"
+  assume_role_policy = data.aws_iam_policy_document.snapshot_scheduler_assume.json
+}
+
+data "aws_iam_policy_document" "snapshot_scheduler_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "snapshot_scheduler_invoke_lambda" {
+  count = var.snapshot_schedule_enabled ? 1 : 0
+  name  = "invoke-snapshot-lambda"
+  role  = aws_iam_role.snapshot_scheduler[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
+        Resource = aws_lambda_function.snapshot.arn
+      },
+    ]
+  })
+}

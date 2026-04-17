@@ -42,8 +42,14 @@ variable "snapshot_schedule_enabled" {
 
 variable "snapshot_schedule_expression" {
   type        = string
-  description = "EventBridge schedule expression for snapshot updates (e.g. rate(6 hours))."
-  default     = "rate(6 hours)"
+  description = "EventBridge Scheduler expression. Default: daily at 06:00 local (see snapshot_schedule_timezone)."
+  default     = "cron(0 6 * * ? *)"
+}
+
+variable "snapshot_schedule_timezone" {
+  type        = string
+  description = "IANA timezone for evaluating the schedule (default Europe/London). Use \"\" for UTC."
+  default     = "Europe/London"
 }
 
 variable "snapshot_prompt" {
@@ -117,8 +123,8 @@ variable "alarm_duration_p95_threshold_ms" {
 
 variable "alarm_min_invocations_period_seconds" {
   type        = number
-  description = "Period used to detect missing snapshot runs via Lambda invocations."
-  default     = 28800
+  description = "CloudWatch period (seconds) for missing-run alarm; should cover at least one schedule interval (86400 for daily)."
+  default     = 86400
 }
 
 variable "alarm_cloudfront_5xx_rate_threshold" {

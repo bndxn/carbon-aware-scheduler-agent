@@ -28,24 +28,32 @@ resource "aws_lambda_function" "snapshot" {
   ]
 }
 
-resource "aws_cloudwatch_event_rule" "snapshot_schedule" {
-  count               = var.snapshot_schedule_enabled ? 1 : 0
-  name                = "${var.project_name}-snapshot-schedule"
+# EventBridge Scheduler (not CloudWatch Events rules) supports IANA time zones for cron().
+resource "aws_scheduler_schedule" "snapshot" {
+  count       = var.snapshot_schedule_enabled ? 1 : 0
+  name        = "${var.project_name}-snapshot-schedule"
+  description = "Invokes snapshot Lambda on a fixed schedule."
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
   schedule_expression = var.snapshot_schedule_expression
-  description         = "Runs Lambda snapshot job on a fixed schedule."
+  schedule_expression_timezone = (
+    var.snapshot_schedule_timezone != "" ? var.snapshot_schedule_timezone : null
+  )
+
+  target {
+    arn      = aws_lambda_function.snapshot.arn
+    role_arn = aws_iam_role.snapshot_scheduler[0].arn
+  }
 }
 
-resource "aws_cloudwatch_event_target" "snapshot_lambda" {
-  count = var.snapshot_schedule_enabled ? 1 : 0
-  rule  = aws_cloudwatch_event_rule.snapshot_schedule[0].name
-  arn   = aws_lambda_function.snapshot.arn
-}
-
-resource "aws_lambda_permission" "allow_eventbridge_snapshot" {
+resource "aws_lambda_permission" "allow_scheduler_snapshot" {
   count         = var.snapshot_schedule_enabled ? 1 : 0
-  statement_id  = "AllowExecutionFromEventBridgeSnapshotSchedule"
+  statement_id  = "AllowExecutionFromEventBridgeScheduler"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.snapshot.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.snapshot_schedule[0].arn
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.snapshot[0].arn
 }
