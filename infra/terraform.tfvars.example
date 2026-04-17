@@ -27,6 +27,8 @@ project_name        = "carbon-agent"
 
 # Optional: CloudFront price class (default PriceClass_100).
 # cloudfront_price_class = "PriceClass_200"
+# waf_enabled = true
+# waf_common_rule_set_override_action = "none" # set to "count" to monitor false positives
 
 # Optional: GitHub OIDC deploy role (PR5). Requires GitHub IAM OIDC provider in the account.
 # github_repository     = "my-org/carbon-aware-scheduler-agent"

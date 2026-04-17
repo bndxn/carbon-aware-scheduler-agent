@@ -6,6 +6,7 @@ Creates:
 - **IAM** execution role for Lambda (CloudWatch logs + Bedrock invoke + write snapshot to S3)
 - **Bedrock model invocation** (Claude via Bedrock) using IAM auth (no external API key)
 - **S3** bucket (private) + **CloudFront** distribution with **origin access control (OAC)** and response security headers
+- **Optional WAFv2 Web ACL** (CloudFront scope) with AWS managed baseline rules
 - **CloudWatch alarms + SNS topic** for snapshot reliability and optional CloudFront 5xx monitoring
 - **Optional GitHub Actions deploy role** (OIDC): set `github_repository` to `owner/repo` to create an IAM role with snapshot Lambda update, S3 sync, and CloudFront invalidation (use `terraform output -raw github_actions_deploy_role_arn` as **`AWS_ROLE_ARN`**)
 
@@ -91,6 +92,8 @@ The managed **GitHub deploy role** (when enabled) only targets the snapshot Lamb
 - `static_site_bucket_name` - override the default `{project_name}-static-{account_id}` S3 bucket name (must be globally unique).
 - `cloudfront_price_class` - default `PriceClass_100` (US/Europe).
 - `cloudfront_cache_policy_id` - default is AWS managed **CachingOptimized** (avoids `cloudfront:ListCachePolicies` during plan).
+- `waf_enabled` - enable/disable baseline CloudFront WAF protections (default `true`).
+- `waf_common_rule_set_override_action` - set to `none` (enforce) or `count` (monitor-only) for `AWSManagedRulesCommonRuleSet`.
 - `lambda_memory_size` / `lambda_timeout_seconds` - tune Lambda cost/performance.
 - `lambda_package_path` - zip used for first create (deploy workflow updates function code after that).
 - `snapshot_schedule_enabled` - enable/disable scheduled snapshot Lambda.
@@ -110,3 +113,7 @@ The managed **GitHub deploy role** (when enabled) only targets the snapshot Lamb
 ## Bedrock access
 
 Ensure the Lambda execution role is allowed to invoke the configured Bedrock model and that the model is available in your chosen region.
+
+## WAF false-positive handling
+
+Start with `waf_common_rule_set_override_action = "count"` to observe matches without blocking traffic, then switch to `"none"` once behavior looks safe. If a specific managed sub-rule causes false positives, add a targeted `rule_action_override` for that rule name in `aws_wafv2_web_acl.static_site` rather than disabling the entire rule group.
