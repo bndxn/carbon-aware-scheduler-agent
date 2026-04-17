@@ -51,6 +51,7 @@ resource "aws_cloudfront_distribution" "static_site" {
   comment             = "${var.project_name} static site"
   default_root_object = "index.html"
   price_class         = var.cloudfront_price_class
+  web_acl_id          = var.waf_enabled ? aws_wafv2_web_acl.static_site[0].arn : null
 
   origin {
     domain_name              = aws_s3_bucket.static_site.bucket_regional_domain_name
@@ -76,6 +77,54 @@ resource "aws_cloudfront_distribution" "static_site" {
 
   viewer_certificate {
     cloudfront_default_certificate = true
+  }
+}
+
+resource "aws_wafv2_web_acl" "static_site" {
+  count    = var.waf_enabled ? 1 : 0
+  provider = aws.us_east_1
+
+  name        = "${var.project_name}-static-web-acl"
+  description = "Baseline WAF protections for static CloudFront distribution."
+  scope       = "CLOUDFRONT"
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "AWSManagedRulesCommonRuleSet"
+    priority = 1
+
+    override_action {
+      dynamic "none" {
+        for_each = var.waf_common_rule_set_override_action == "none" ? [1] : []
+        content {}
+      }
+      dynamic "count" {
+        for_each = var.waf_common_rule_set_override_action == "count" ? [1] : []
+        content {}
+      }
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesCommonRuleSet"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.project_name}-waf-common"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.project_name}-waf"
+    sampled_requests_enabled   = true
   }
 }
 

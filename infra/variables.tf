@@ -55,7 +55,7 @@ variable "snapshot_schedule_timezone" {
 variable "snapshot_prompt" {
   type        = string
   description = "Prompt used by the scheduled Lambda job to generate snapshot content."
-  default = <<-EOT
+  default     = <<-EOT
     Find the best day and approximate time window in the next few days to start a washing machine in Great Britain. Optimise for (1) lower grid carbon intensity during the wash and (2) clothes drying afterward: I can dry indoors or outside but prefer line drying outside, which needs dry weather and ideally mild or warm conditions. If I did not name a place, use London, UK as the default for weather_wind_forecast. Reply in Markdown with one primary recommendation, one backup, and short reasoning.
   EOT
 }
@@ -89,6 +89,23 @@ variable "cloudfront_cache_policy_id" {
   type        = string
   description = "AWS managed cache policy ID (default: Managed-CachingOptimized; avoids cloudfront:ListCachePolicies)."
   default     = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+}
+
+variable "waf_enabled" {
+  type        = bool
+  description = "Enable baseline WAF protections for CloudFront."
+  default     = true
+}
+
+variable "waf_common_rule_set_override_action" {
+  type        = string
+  description = "Rule group override action for AWSManagedRulesCommonRuleSet: none (enforce) or count (monitor-only)."
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "count"], var.waf_common_rule_set_override_action)
+    error_message = "waf_common_rule_set_override_action must be one of: none, count."
+  }
 }
 
 variable "github_repository" {
