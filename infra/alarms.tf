@@ -78,12 +78,12 @@ resource "aws_cloudwatch_metric_alarm" "snapshot_lambda_duration_p95" {
 resource "aws_cloudwatch_metric_alarm" "snapshot_schedule_failed_invocations" {
   count               = local.alarms_enabled_with_schedule ? 1 : 0
   alarm_name          = "${var.project_name}-snapshot-schedule-failed-invocations"
-  alarm_description   = "EventBridge schedule failed to invoke snapshot Lambda."
+  alarm_description   = "EventBridge Scheduler failed to invoke snapshot Lambda."
   comparison_operator = "GreaterThanOrEqualToThreshold"
   evaluation_periods  = 1
   threshold           = 1
-  metric_name         = "FailedInvocations"
-  namespace           = "AWS/Events"
+  metric_name         = "InvocationsFailed"
+  namespace           = "AWS/Scheduler"
   period              = 300
   statistic           = "Sum"
   treat_missing_data  = "notBreaching"
@@ -91,7 +91,8 @@ resource "aws_cloudwatch_metric_alarm" "snapshot_schedule_failed_invocations" {
   ok_actions          = [aws_sns_topic.alerts[0].arn]
 
   dimensions = {
-    RuleName = aws_cloudwatch_event_rule.snapshot_schedule[0].name
+    ScheduleGroup = "default"
+    ScheduleName  = aws_scheduler_schedule.snapshot[0].name
   }
 }
 

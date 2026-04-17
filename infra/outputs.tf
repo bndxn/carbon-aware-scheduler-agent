@@ -19,7 +19,7 @@ output "static_site_url" {
 }
 
 output "snapshot_schedule_expression" {
-  description = "EventBridge schedule expression for snapshot refreshes."
+  description = "EventBridge Scheduler expression for snapshot refreshes."
   value       = var.snapshot_schedule_expression
 }
 
