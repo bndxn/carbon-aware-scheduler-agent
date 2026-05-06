@@ -2,7 +2,7 @@
 
 Creates:
 
-- **Lambda** function for scheduled snapshot generation, triggered by **EventBridge Scheduler** (default **daily at 06:00 `Europe/London`**), writing `snapshot.json` to the static S3 bucket
+- **Lambda** function for scheduled snapshot generation, triggered by **EventBridge Scheduler** (default **once every 14 days**), writing `snapshot.json` to the static S3 bucket
 - **IAM** execution role for Lambda (CloudWatch logs + Bedrock invoke + write snapshot to S3)
 - **Bedrock model invocation** (Claude via Bedrock) using IAM auth (no external API key)
 - **S3** bucket (private) + **CloudFront** distribution with **origin access control (OAC)** and response security headers
@@ -97,7 +97,7 @@ The managed **GitHub deploy role** (when enabled) only targets the snapshot Lamb
 - `lambda_memory_size` / `lambda_timeout_seconds` - tune Lambda cost/performance.
 - `lambda_package_path` - zip used for first create (deploy workflow updates function code after that).
 - `snapshot_schedule_enabled` - enable/disable scheduled snapshot Lambda.
-- `snapshot_schedule_expression` - EventBridge **Scheduler** expression (default `cron(0 6 * * ? *)` = daily 06:00 in `snapshot_schedule_timezone`).
+- `snapshot_schedule_expression` - EventBridge **Scheduler** expression (default `rate(14 days)` = once every 2 weeks).
 - `snapshot_schedule_timezone` - IANA zone for the schedule (default `Europe/London`; set empty string for UTC).
 - `snapshot_s3_key` - S3 object key written by the snapshot Lambda (default `snapshot.json`).
 - `snapshot_prompt` - agent prompt used for each scheduled snapshot generation.
@@ -105,6 +105,7 @@ The managed **GitHub deploy role** (when enabled) only targets the snapshot Lamb
 - `alarm_email_endpoints` - list of email addresses subscribed to alarms (requires confirmation).
 - `alarm_duration_p95_threshold_ms` - threshold for p95 snapshot Lambda duration alarm.
 - `alarm_min_invocations_period_seconds` - window to detect missing scheduled runs.
+  - Note: CloudWatch limits this alarm window to <= 7 days; if set higher, Terraform now skips creating this specific alarm.
 - `alarm_cloudfront_5xx_enabled` - enable/disable CloudFront 5xx alarm.
 - `alarm_cloudfront_5xx_rate_threshold` - threshold for CloudFront 5xx error rate alarm.
 - `github_repository` - e.g. `org/repo`; empty skips the OIDC deploy role.

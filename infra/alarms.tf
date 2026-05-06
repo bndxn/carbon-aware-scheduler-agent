@@ -1,5 +1,7 @@
 locals {
   alarms_enabled_with_schedule = var.alarms_enabled && var.snapshot_schedule_enabled
+  # CloudWatch alarms with period >= 3600 are limited to <= 7 days total window.
+  missing_runs_alarm_supported = var.alarm_min_invocations_period_seconds <= 604800
 }
 
 resource "aws_sns_topic" "alerts" {
@@ -97,7 +99,7 @@ resource "aws_cloudwatch_metric_alarm" "snapshot_schedule_failed_invocations" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "snapshot_lambda_missing_runs" {
-  count               = local.alarms_enabled_with_schedule ? 1 : 0
+  count               = local.alarms_enabled_with_schedule && local.missing_runs_alarm_supported ? 1 : 0
   alarm_name          = "${var.project_name}-snapshot-missing-runs"
   alarm_description   = "Snapshot Lambda was not invoked during expected schedule window."
   comparison_operator = "LessThanThreshold"

@@ -42,8 +42,8 @@ variable "snapshot_schedule_enabled" {
 
 variable "snapshot_schedule_expression" {
   type        = string
-  description = "EventBridge Scheduler expression. Default: daily at 06:00 local (see snapshot_schedule_timezone)."
-  default     = "cron(0 6 * * ? *)"
+  description = "EventBridge Scheduler expression. Default: once every 14 days."
+  default     = "rate(14 days)"
 }
 
 variable "snapshot_schedule_timezone" {
@@ -140,8 +140,8 @@ variable "alarm_duration_p95_threshold_ms" {
 
 variable "alarm_min_invocations_period_seconds" {
   type        = number
-  description = "CloudWatch period (seconds) for missing-run alarm; should cover at least one schedule interval (86400 for daily)."
-  default     = 86400
+  description = "CloudWatch period (seconds) for missing-run alarm. Note: values > 604800 disable this alarm due to CloudWatch limits."
+  default     = 1209600
 }
 
 variable "alarm_cloudfront_5xx_rate_threshold" {

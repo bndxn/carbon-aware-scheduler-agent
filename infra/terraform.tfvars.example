@@ -17,7 +17,7 @@ project_name        = "carbon-agent"
 
 # Optional: scheduled snapshot job (cost optimization).
 # snapshot_schedule_enabled     = true
-# snapshot_schedule_expression  = "cron(0 6 * * ? *)"  # daily 06:00 (see timezone)
+# snapshot_schedule_expression  = "rate(14 days)"  # once every 2 weeks
 # snapshot_schedule_timezone    = "Europe/London"
 # snapshot_s3_key              = "snapshot.json"
 # snapshot_prompt = "Find the best day and approximate time window in the next few days to start a washing machine in Great Britain. Optimise for (1) lower grid carbon intensity during the wash and (2) clothes drying afterward: I can dry indoors or outside but prefer line drying outside, which needs dry weather and ideally mild or warm conditions. If I did not name a place, use London, UK as the default for weather_wind_forecast. Reply in Markdown with one primary recommendation, one backup, and short reasoning."
